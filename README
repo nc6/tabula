@@ -1,0 +1,4 @@
+Tabula is tool for recording and analysing command line sessions. It is similar to
+the Unix 'script' tool, but also records details such as command exit status, snippets
+from stdin and stdout. Rather than recording to a file, commands are sent to a listening
+server which collates resources from multiple terminals.
