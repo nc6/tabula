@@ -5,14 +5,13 @@ Record data type. Designed to be imported qualified.
 module Tabula.Record where
   import Data.Aeson
   import Data.Aeson.TH
-  import qualified Data.ByteString.Lazy as B
   import Data.Time.Clock
 
   data Record = Record {
       namespace :: String
     , version :: Int
     , timestamp :: UTCTime
-    , entry :: B.ByteString
+    , entry :: Value
   }
 
   $(deriveJSON defaultOptions ''Record)
@@ -27,5 +26,5 @@ module Tabula.Record where
                 (getNamespace a)
                 (getVersion a)
                 (getTimestamp a)
-                (encode a)
+                (toJSON a)
              )

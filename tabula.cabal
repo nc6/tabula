@@ -58,6 +58,7 @@ executable tabula
                       , Tabula.Record.Console
                       , Tabula.Destination
                       , Tabula.Destination.File
+                      , Tabula.Strings
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
