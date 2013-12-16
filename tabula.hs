@@ -8,7 +8,8 @@ module Main where
   import Data.Time.Clock
   import Data.Traversable (sequence)
 
-  import GHC.IO.Handle.FD (fdToHandle)
+  --import GHC.IO.Device (setRaw)
+  --import GHC.IO.FD (FD(..))
 
   import Network.BSD (getHostName)
   import Network.URL
@@ -19,8 +20,8 @@ module Main where
   import System.IO
   import System.Posix.Directory (getWorkingDirectory)
   import System.Process
+  import System.Posix.IO (fdToHandle)
   import System.Posix.Terminal (openPseudoTerminal)
-  import System.Posix.Types (Fd(Fd))
 
   import qualified Tabula.Record as Rec
   import qualified Tabula.Record.Console as Rec.Cons
@@ -41,6 +42,12 @@ module Main where
 
   readEvalPrintLoop :: IO ()
   readEvalPrintLoop = do
+      pty <- do
+        (a, b) <- openPseudoTerminal
+        --setRaw (FD (fromIntegral b) 0) True
+        a' <- fdToHandle a
+        b' <- fdToHandle b
+        return (a',b')
       maybeLine <- RL.readline "% "
       case maybeLine of
         Nothing     -> return () -- EOF / control-d
@@ -50,18 +57,12 @@ module Main where
           readEvalPrintLoop
         Just line -> do 
           RL.addHistory line
-          record <- eval line
-          makeEntry fileDest record
+          eval pty line
           readEvalPrintLoop
-    where fileDest = FD.fileDestination "typescript"
 
-  eval :: String -> IO Rec.Record
-  eval command = do
-      (ptym, ptys) <- do
-        (a,b) <- openPseudoTerminal
-        a' <- fdify a
-        b' <- fdify b
-        return (a',b')
+  eval :: (Handle, Handle) -> String -> IO ()
+  eval pty command = do
+      let (ptym, ptys) = pty
       hostName <- getHostName
       workingDirectory <- getWorkingDirectory
       priorEnv <- getEnvironment
@@ -89,8 +90,8 @@ module Main where
                       snipErr
                       (exitCodeInt exitCode)
                   )
-      return record
-    where fdify (Fd x) = fdToHandle x
+      makeEntry fileDest record
+    where fileDest = FD.fileDestination "typescript"
 
   evalMetaCommand :: String -> IO ()
   evalMetaCommand command = case command of
