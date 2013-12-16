@@ -11,6 +11,7 @@ module Tabula.Record.Console where
   data ConsoleRecord = ConsoleRecord {
       command :: String
     , host :: String
+    , workingDirectory :: FilePath
     , priorEnv :: Env
     , posteriorEnv :: Env
     , startTime :: UTCTime
@@ -24,5 +25,5 @@ module Tabula.Record.Console where
 
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
-    getVersion _ = 1
+    getVersion _ = 2
     getTimestamp a = startTime a
