@@ -8,9 +8,6 @@ module Main where
   import Data.Time.Clock
   import Data.Traversable (sequence)
 
-  --import GHC.IO.Device (setRaw)
-  --import GHC.IO.FD (FD(..))
-
   import Network.BSD (getHostName)
   import Network.URL
 
@@ -20,8 +17,8 @@ module Main where
   import System.IO
   import System.Posix.Directory (getWorkingDirectory)
   import System.Process
-  import System.Posix.IO (fdToHandle)
-  import System.Posix.Terminal (openPseudoTerminal)
+  import System.Posix.IO (fdToHandle, openFd, OpenMode(ReadWrite), defaultFileFlags)
+  import System.Posix.Terminal 
 
   import qualified Tabula.Record as Rec
   import qualified Tabula.Record.Console as Rec.Cons
@@ -43,11 +40,22 @@ module Main where
   readEvalPrintLoop :: IO ()
   readEvalPrintLoop = do
       pty <- do
+        parentTerminal <- getControllingTerminalName >>= 
+                          \a -> openFd a ReadWrite Nothing defaultFileFlags
+        sttyp <- getTerminalAttributes parentTerminal
         (a, b) <- openPseudoTerminal
-        --setRaw (FD (fromIntegral b) 0) True
+        let rawModes = [ProcessInput, KeyboardInterrupts, ExtendedFunctions, 
+                        EnableEcho, InterruptOnBreak, MapCRtoLF, IgnoreBreak, 
+                        IgnoreCR, MapLFtoCR, CheckParity, StripHighBit, 
+                        StartStopOutput, MarkParityErrors, ProcessOutput]
+            sttym = withoutModes rawModes sttyp
+            withoutModes modes tty = foldl withoutMode tty modes
+        setTerminalAttributes b sttym Immediately
+        setTerminalAttributes a sttym Immediately
         a' <- fdToHandle a
         b' <- fdToHandle b
         return (a',b')
+
       maybeLine <- RL.readline "% "
       case maybeLine of
         Nothing     -> return () -- EOF / control-d
