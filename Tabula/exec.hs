@@ -91,9 +91,7 @@ module Tabula.Exec (exec) where
         return (hm, hs)
 
       finalise :: TerminalAttributes -> Fd -> (Handle, Handle) -> IO ()
-      finalise parentAttrs cTerm (hm, hs) = do
-        hClose hm
-        hClose hs
+      finalise parentAttrs cTerm _ = do
         setTerminalAttributes cTerm parentAttrs Immediately
 
       rawModes = [ProcessInput, KeyboardInterrupts, ExtendedFunctions, 
