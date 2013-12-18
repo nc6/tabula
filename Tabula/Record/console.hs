@@ -16,7 +16,6 @@ module Tabula.Record.Console where
     , posteriorEnv :: Env
     , startTime :: UTCTime
     , endTime :: UTCTime
-    , stdin :: Maybe B.ByteString
     , stdout :: Maybe B.ByteString
     , stderr :: Maybe B.ByteString
     , exitStatus :: Int
@@ -26,5 +25,5 @@ module Tabula.Record.Console where
 
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
-    getVersion _ = 3
+    getVersion _ = 2
     getTimestamp a = startTime a

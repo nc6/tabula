@@ -40,9 +40,9 @@ module Tabula.Exec (exec) where
         , std_out = UseHandle ptys
         , std_in = UseHandle ptys
       }
+    forkIO . runResourceT $ DCB.sourceHandle stdin $$ DCB.sinkHandle ptym
     snipOut <- tee 256 ptym stdout
     snipErr <- sequence $ fmap (\h -> tee 256 h stderr) hErr
-    snipIn <- tee 256 stdin ptym
     exitCode <- waitForProcess ph
     endTime <- getCurrentTime
     posteriorEnv <- getEnvironment
@@ -54,7 +54,6 @@ module Tabula.Exec (exec) where
                     posteriorEnv
                     startTime
                     endTime
-                    (Just snipIn)
                     (Just snipOut)
                     snipErr
                     (exitCodeInt exitCode)
@@ -67,7 +66,7 @@ module Tabula.Exec (exec) where
     _ <- forkIO . runResourceT $ DCB.sourceHandle from
           $= DCB.conduitHandle to -- Sink contents to out Handle
           $$ sinkTBMChan chan
-    runResourceT $ sourceTBMChan chan $$ DCB.take bytes -- Pull off the start of the stream
+    runResourceT $ sourceTBMChan chan $$ DCB.take bytes
 
   exitCodeInt :: ExitCode -> Int
   exitCodeInt ExitSuccess = 0
