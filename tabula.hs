@@ -1,9 +1,6 @@
 module Main where
   import Prelude hiding (sequence)
-  
-  import qualified Data.ByteString.Lazy.Char8 as B
-  import Data.Conduit
-  import qualified Data.Conduit.Binary as DCB
+
   import Data.List (isPrefixOf)
   import Data.Time.Clock
   import Data.Traversable (sequence)
@@ -20,6 +17,7 @@ module Main where
   import System.Posix.IO (fdToHandle, openFd, OpenMode(ReadWrite), defaultFileFlags)
   import System.Posix.Terminal 
 
+  import Tabula.Exec
   import qualified Tabula.Record as Rec
   import qualified Tabula.Record.Console as Rec.Cons
   import Tabula.Destination (makeEntry)
@@ -81,8 +79,9 @@ module Main where
           , std_out = UseHandle ptys
           , std_in = UseHandle ptys
         }
-      snipOut <- tee ptym stdout
-      snipErr <- sequence $ fmap (\h -> tee h stderr) hErr
+      snipOut <- tee 256 ptym stdout
+      snipErr <- sequence $ fmap (\h -> tee 256 h stderr) hErr
+      snipIn <- tee 256 stdin ptym
       exitCode <- waitForProcess ph
       endTime <- getCurrentTime
       posteriorEnv <- getEnvironment
@@ -94,6 +93,7 @@ module Main where
                       posteriorEnv
                       startTime
                       endTime
+                      (Just snipIn)
                       (Just snipOut)
                       snipErr
                       (exitCodeInt exitCode)
@@ -104,12 +104,3 @@ module Main where
   evalMetaCommand :: String -> IO ()
   evalMetaCommand command = case command of
     a -> putStrLn $ S.metaCommandNotFound a
-
-  tee :: Handle -> Handle -> IO B.ByteString
-  tee from to = DCB.sourceHandle from
-                $= DCB.conduitHandle to -- Sink contents to out Handle
-                $$ DCB.take 256 -- Pull off the start of the stream
-
-  exitCodeInt :: ExitCode -> Int
-  exitCodeInt ExitSuccess = 0
-  exitCodeInt (ExitFailure a) = a 
