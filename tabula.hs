@@ -42,15 +42,13 @@ module Main where
       -- Configure PROMPT_COMMAND
       -- Display a shell
       myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
-      (_,_,_,ph) <- createProcess $ (proc myShell []) {
+      (_,_,_,ph) <- createProcess $ (proc myShell ["-il"]) {
           std_in = UseHandle pty1s
         , std_out = UseHandle pty2s
         , std_err = UseHandle pty1s
         , delegate_ctlc = True
+        , close_fds = True
       }
-      --forkIO . runResourceT $ DCB.sourceHandle stdin $$ DCB.sinkHandle pty1m
-      --forkIO . runResourceT $ DCB.sourceHandle pty1m $$ DCB.sinkHandle stderr
-      --forkIO . runResourceT $ DCB.sourceHandle pty2m $$ DCB.sinkHandle stdout
       waitForProcess ph
     exitWith exitStatus
     where 
