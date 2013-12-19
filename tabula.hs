@@ -14,6 +14,7 @@ module Main where
   import System.Environment (lookupEnv)
   import System.Exit (exitWith)
   import System.IO (Handle(), stdin, stdout, stderr)
+  import System.Log.Logger
   import System.Posix.IO (fdToHandle)
   import System.Posix.Terminal
   import System.Process
@@ -23,31 +24,42 @@ module Main where
   type BSChan = TBMChan ByteString
 
   main :: IO ()
-  main = showShell
+  main = updateGlobalLogger "tabula" (setLevel DEBUG) >> showShell
 
   showShell :: IO ()
-  showShell = getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
-      -- Start two pseudo-terminals. We'll use one for in/err and the other for out
-      (pty1m, pty1s) <- openPtyHandles
-      (pty2m, pty2s) <- openPtyHandles
-      -- Tee off all of them
-      inChan <- tee 256 stdin pty1m
-      errChan <- tee 256 pty1m stderr
-      outChan <- tee 256 pty2m stdout
-      -- Start listening daemon in background thread
-
+  showShell = do
+    -- Start two pseudo-terminals. We'll use one for in/err and the other for out
+    (pty1m, pty1s) <- openPtyHandles
+    (pty2m, pty2s) <- openPtyHandles
+    --Tee off all of them
+    inChan <- tee 256 stdin pty1m
+    errChan <- tee 256 pty1m stderr
+    outChan <- tee 256 pty2m stdout
+    -- Start listening daemon in background thread
+    daemon (inChan, outChan, errChan)
+    debugM "tabula" $ "Setting parent terminal to raw mode."
+    exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
       -- Display a shell
       myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
-      (_,_,_,ph) <- createProcess $ (proc myShell ["-i"]) {
+      (_,_,_,ph) <- createProcess $ (proc myShell []) {
           std_in = UseHandle pty1s
         , std_out = UseHandle pty2s
         , std_err = UseHandle pty1s
         , delegate_ctlc = True
       }
-      waitForProcess ph >>= exitWith
-    where openPtyHandles = 
-            openPseudoTerminal >>= uncurry (ap . fmap (,)) . join (***) fdToHandle
+      --forkIO . runResourceT $ DCB.sourceHandle stdin $$ DCB.sinkHandle pty1m
+      --forkIO . runResourceT $ DCB.sourceHandle pty1m $$ DCB.sinkHandle stderr
+      --forkIO . runResourceT $ DCB.sourceHandle pty2m $$ DCB.sinkHandle stdout
+      waitForProcess ph
+    exitWith exitStatus
+    where 
+      openPtyHandles = do
+        pty <- openPseudoTerminal
+        getControllingTerminal >>= \a -> cloneAttr a (fst pty)
+        s <- getTerminalName . snd $ pty
+        debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
+        uncurry (ap . fmap (,)) . join (***) fdToHandle $ pty
 
   daemon :: (BSChan, BSChan, BSChan) -> IO ()
   daemon (inC, outC, errC) = do

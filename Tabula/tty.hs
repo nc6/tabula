@@ -28,3 +28,7 @@ module Tabula.TTY where
                 IgnoreCR, MapLFtoCR, CheckParity, StripHighBit, 
                 StartStopOutput, MarkParityErrors, ProcessOutput]
     withoutModes modes tty = foldl withoutMode tty modes
+
+  cloneAttr :: Fd -> Fd -> IO ()
+  cloneAttr from to = getTerminalAttributes from >>= 
+    \a -> setTerminalAttributes to a Immediately

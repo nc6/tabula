@@ -52,11 +52,12 @@ cabal-version:       >=1.10
 executable tabula
   -- .hs or .lhs file containing the Main module.
   main-is:  tabula.hs
+
+  ghc-options: -rtsopts
   
   -- Modules included in this executable, other than Main.
   other-modules:        Tabula.Record
                       , Tabula.Record.Console
-                      , Tabula.Exec
                       , Tabula.Destination
                       , Tabula.Destination.File
                       , Tabula.Strings
@@ -69,9 +70,9 @@ executable tabula
                       , aeson
                       , bytestring
                       , conduit
+                      , hslogger
                       , network
                       , process >= 1.2.0
-                      , readline
                       , stm
                       , stm-chans
                       , stm-conduit
