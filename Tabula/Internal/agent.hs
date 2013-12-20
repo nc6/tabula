@@ -18,8 +18,8 @@ module Tabula.Internal.Agent (trap, debug) where
     sockAddr : [] -> do
       time <- getCurrentTime
       cmd <- getEnv "BASH_COMMAND"
-      pid <- fmap show $ getEnv "BASHPID"
-      ppid <- fmap show $ getEnv "PPID"
+      pid <- fmap read $ getEnv "BASHPID"
+      ppid <- fmap read $ getEnv "PPID"
       env <- getEnvironment
       let msg = E.Debug time cmd pid ppid env
       -- connect to socket, send the entire thing
@@ -32,13 +32,11 @@ module Tabula.Internal.Agent (trap, debug) where
 
   prompt :: IO ()
   prompt = getArgs >>= \case
-    sockAddr : [] -> do
+    sockAddr : cmd : exitCode -> do
       time <- getCurrentTime
-      cmd <- undefined
       cwd <- getWorkingDirectory
       env <- getEnvironment
-      exitCode <- undefined
-      let msg = E.Prompt time env cwd cmd exitCode
+      let msg = E.Prompt time env cwd cmd (read exitCode)
       -- connect to socket, send the entire thing
       soc <- socket AF_UNIX Stream 0
       connect soc (SockAddrUnix sockAddr)
