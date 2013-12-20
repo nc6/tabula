@@ -11,13 +11,18 @@ module Main where
   import Data.Conduit.TMChan (sourceTBMChan, sinkTBMChan)
   import Data.Maybe (fromMaybe)
 
+  import Network.Socket (Family(AF_UNIX), SocketType(Stream) 
+                         , SockAddr(SockAddrUnix), Socket()
+                         , bind, socket, connect)
+
   import System.Environment (lookupEnv)
-  import System.Exit (exitWith)
+  import System.Exit (ExitCode(), exitWith)
   import System.IO (Handle(), stdin, stdout, stderr)
   import System.Log.Logger
   import System.Posix.IO (fdToHandle)
   import System.Posix.Terminal
   import System.Process
+  import System.Random (randomRIO)
 
   import Tabula.TTY
 
@@ -32,11 +37,11 @@ module Main where
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
     --Tee off all of them
-    inChan <- tee 256 stdin pty1m
-    errChan <- tee 256 pty1m stderr
-    outChan <- tee 256 pty2m stdout
+    inChan <- tee 16 stdin pty1m
+    errChan <- tee 16 pty1m stderr
+    outChan <- tee 16 pty2m stdout
     -- Start listening daemon in background thread
-    daemon (inChan, outChan, errChan)
+    _ <- daemon (inChan, outChan, errChan)
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
@@ -47,7 +52,6 @@ module Main where
         , std_out = UseHandle pty2s
         , std_err = UseHandle pty1s
         , delegate_ctlc = True
-        , close_fds = True
       }
       waitForProcess ph
     exitWith exitStatus
@@ -59,12 +63,17 @@ module Main where
         debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
         uncurry (ap . fmap (,)) . join (***) fdToHandle $ pty
 
-  daemon :: (BSChan, BSChan, BSChan) -> IO ()
+  daemon :: (BSChan, BSChan, BSChan) -> IO Socket
   daemon (inC, outC, errC) = do
+    sockAddr <- fmap (\a -> "/tmp/tabula" ++ (show a) ++ ".soc")
+      (randomRIO (0, 9999999) :: IO Int)
+    -- Start up a domain socket to do the listening
+    soc <- socket AF_UNIX Stream 0
+    bind soc (SockAddrUnix sockAddr)
     _ <- forkIO $ runResourceT $ sourceTBMChan inC $$ DCB.sinkFile "test_in"
     _ <- forkIO $ runResourceT $ sourceTBMChan outC $$ DCB.sinkFile "test_out"
     _ <- forkIO $ runResourceT $ sourceTBMChan errC $$ DCB.sinkFile "test_err"
-    return ()
+    return soc
 
   tee :: Int -> Handle -> Handle -> IO BSChan
   tee bufSize from to = do

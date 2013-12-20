@@ -73,6 +73,7 @@ executable tabula
                       , hslogger
                       , network
                       , process >= 1.2.0
+                      , random
                       , stm
                       , stm-chans
                       , stm-conduit
