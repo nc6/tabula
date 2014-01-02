@@ -50,7 +50,7 @@ module Main where
       tabula <- getExecutablePath
       oldEnv <- fmap Map.fromList getEnvironment
       sn <- socketName soc
-      let promptCommand = tabula ++ " prompt " ++ sn ++ " $? !!"
+      let promptCommand = tabula ++ " prompt " ++ sn ++ " $? $(history 1)"
           newEnv = Map.toAscList $ Map.insert "PROMPT_COMMAND" promptCommand oldEnv
       -- Display a shell
       myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
@@ -62,8 +62,10 @@ module Main where
         , delegate_ctlc = True
       }
       -- Configure debug trap
-      let trapCommand = "trap '" ++ tabula ++ " trap " ++ sn ++ "' DEBUG"
+      let trapCommand = "trap '" ++ tabula ++ " trap " ++
+                        sn ++ " $BASHPID $BASHPPID $BASH_COMMAND' DEBUG"
       hPutStrLn pty1m trapCommand
+      -- Wait for exit
       waitForProcess ph
     -- Clean up the socket
     cleanSocket soc
