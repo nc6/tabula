@@ -63,7 +63,7 @@ module Main where
       }
       -- Configure debug trap
       let trapCommand = "trap '" ++ tabula ++ " trap " ++
-                        sn ++ " $BASHPID $BASHPPID $BASH_COMMAND' DEBUG"
+                        sn ++ " $BASHPID $PPID $BASH_COMMAND' DEBUG"
       hPutStrLn pty1m trapCommand
       -- Wait for exit
       waitForProcess ph
