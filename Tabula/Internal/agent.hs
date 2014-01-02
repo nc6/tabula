@@ -4,19 +4,20 @@ Agents for data collection. These are actually small programs
 which are invoked from the shell and report back to the collection
 daemon.
 -}
-module Tabula.Internal.Agent (trap, debug) where
+module Tabula.Internal.Agent (trap, prompt) where
   import Data.Aeson (encode)
   import Data.Time.Clock
 
   import Network.Socket
+  import Network.Socket.ByteString.Lazy (sendAll)
 
-  import System.Environment (getArgs, getEnv, getEnvironment)
+  import System.Environment (getEnv, getEnvironment)
   import System.Posix.Directory (getWorkingDirectory)
 
   import qualified Tabula.Internal.Event as E
 
-  trap :: IO ()
-  trap = getArgs >>= \case
+  trap :: [String] -> IO ()
+  trap args = case args of
     sockAddr : [] -> do
       time <- getCurrentTime
       cmd <- getEnv "BASH_COMMAND"
@@ -31,10 +32,9 @@ module Tabula.Internal.Agent (trap, debug) where
       sClose soc
     _ -> error "No socket address supplied."
 
-
-  prompt :: IO ()
-  prompt = getArgs >>= \case
-    sockAddr : cmd : exitCode -> do
+  prompt :: [String] -> IO ()
+  prompt args = case args of
+    sockAddr : cmd : exitCode : [] -> do
       time <- getCurrentTime
       cwd <- getWorkingDirectory
       env <- getEnvironment

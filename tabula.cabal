@@ -70,6 +70,7 @@ executable tabula
                       , aeson
                       , bytestring
                       , conduit
+                      , containers
                       , directory
                       , hslogger
                       , network
