@@ -11,12 +11,11 @@ module Main where
   import Data.Conduit.TMChan (sourceTBMChan, sinkTBMChan)
   import Data.Maybe (fromMaybe)
 
-  import Network.Socket (Family(AF_UNIX), SocketType(Stream) 
-                         , SockAddr(SockAddrUnix), Socket()
-                         , bind, socket, connect)
+  import Network.Socket
 
+  import System.Directory (removeFile)
   import System.Environment (lookupEnv)
-  import System.Exit (ExitCode(), exitWith)
+  import System.Exit (exitWith)
   import System.IO (Handle(), stdin, stdout, stderr)
   import System.Log.Logger
   import System.Posix.IO (fdToHandle)
@@ -41,7 +40,7 @@ module Main where
     errChan <- tee 16 pty1m stderr
     outChan <- tee 16 pty2m stdout
     -- Start listening daemon in background thread
-    _ <- daemon (inChan, outChan, errChan)
+    soc <- daemon (inChan, outChan, errChan)
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
@@ -54,6 +53,8 @@ module Main where
         , delegate_ctlc = True
       }
       waitForProcess ph
+    -- Clean up the socket
+    cleanSocket soc
     exitWith exitStatus
     where 
       openPtyHandles = do
@@ -62,6 +63,11 @@ module Main where
         s <- getTerminalName . snd $ pty
         debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
         uncurry (ap . fmap (,)) . join (***) fdToHandle $ pty
+      cleanSocket soc = do
+        name <- getSocketName soc
+        case name of 
+          SockAddrUnix sn -> removeFile sn
+          _ -> return ()
 
   daemon :: (BSChan, BSChan, BSChan) -> IO Socket
   daemon (inC, outC, errC) = do

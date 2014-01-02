@@ -70,6 +70,7 @@ executable tabula
                       , aeson
                       , bytestring
                       , conduit
+                      , directory
                       , hslogger
                       , network
                       , process >= 1.2.0
