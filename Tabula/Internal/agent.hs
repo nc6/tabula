@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-
-Agents for data collection. Report back to 
+Agents for data collection. These are actually small programs
+which are invoked from the shell and report back to the collection
+daemon.
 -}
 module Tabula.Internal.Agent (trap, debug) where
   import Data.Aeson (encode)
