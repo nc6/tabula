@@ -35,7 +35,7 @@ module Main where
     _ -> do
       logFile <- fileHandler "scratch/log" DEBUG
       updateGlobalLogger "tabula" (setLevel DEBUG . setHandlers [logFile]) 
-      showShell 1
+      showShell 64
 
   showShell :: Int -> IO ()
   showShell bufSize = do
@@ -56,6 +56,7 @@ module Main where
       sn <- socketName soc
       let promptCommand = tabula ++ " prompt " ++ sn ++ " $? $(history 1)"
           newEnv = Map.toAscList $ Map.insert "PROMPT_COMMAND" promptCommand oldEnv
+      debugM "tabula" $ "Prompt command:\n\t" ++ promptCommand
       -- Display a shell
       myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
       (_,_,_,ph) <- createProcess $ (proc myShell ["-il"]) {
@@ -68,6 +69,7 @@ module Main where
       -- Configure debug trap
       let trapCommand = "trap '" ++ tabula ++ " trap " ++
                         sn ++ " $BASHPID $PPID $BASH_COMMAND' DEBUG"
+      debugM "tabula" $ "Trap command:\n\t" ++ trapCommand
       hPutStrLn pty1m trapCommand
       -- Wait for exit
       waitForProcess ph

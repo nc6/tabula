@@ -17,6 +17,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Data.Conduit.List as DCL
   import Data.Conduit.Network
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
+  import Debug.Trace (trace)
 
   import Network.BSD (getHostName)
   import Network.Socket
@@ -49,7 +50,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     mergedS <- runResourceT $ mergeSources [inS, outS, errS, socS] bufSize
     debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
-    _ <- forkIO . runResourceT $ mergedS $= 
+    _ <- forkIO . runResourceT $ mergedS $=
       conduitSession bufSize host $= 
       DCL.map (encode . record) $=
       DCL.concatMap L.toChunks $$ 
@@ -62,7 +63,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
       forkListener chan
       return chan
     where
-      forkListener chan = void . forkIO $ listen soc 2 >> loop where 
+      forkListener chan = void . forkIO $ listen soc 1 >> loop where 
         loop = do
           (conn, _) <- accept soc
           runResourceT $ sourceSocket conn $$ parseEvent =$ sinkTBMChan chan
@@ -83,21 +84,29 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     Int -> String -> Conduit E.Event m Rec.ConsoleRecord
   conduitSession bufSize host = go [] [] [] [] Nothing
     where
-      go inB outB errB trapB a = await >>= \case
+      go inB outB errB trapB oldP = await >>= \case
         Just (E.Stdin sb) -> let 
             inB' = if (length inB >= bufSize) then inB else sb : inB
-          in go inB' outB errB trapB a
+          in -- trace ("Stdin: " ++ show sb) $
+              go inB' outB errB trapB oldP
         Just (E.Stdout sb) -> let 
             outB' = if (length outB >= bufSize) then outB else sb : outB
-          in go inB outB' errB trapB a
+          in -- trace ("Stdout: " ++ show sb) $ 
+              go inB outB' errB trapB oldP
         Just (E.Stderr sb) -> let 
             errB' = if (length errB >= bufSize) then errB else sb : errB
-          in go inB outB errB' trapB a
-        Just (sb @ (E.Debug _ _ _ _ _)) -> go inB outB errB (sb : trapB) a
-        Just (sb @ (E.Prompt _ _ _ _ _)) -> sessionize inB outB errB trapB sb a
+          in -- trace ("Stderr: " ++ show sb) $ 
+              go inB outB errB' trapB oldP
+        Just (sb @ (E.Debug _ _ _ _ _)) -> 
+          trace ("Debug event: " ++ show sb) 
+            go inB outB errB (sb : trapB) oldP
+        Just (sb @ (E.Prompt _ _ _ _ _)) -> 
+          trace ("Prompt event: " ++ show sb)
+            sessionize inB outB errB trapB sb oldP
+        Nothing -> trace "Nothing!\n" $ return ()
 
       sessionize inB outB errB trapB prompt old = case old of
-        Nothing -> go [] [] [] [] old
+        Nothing -> trace "No previous prompt." $ go [] [] [] [] (Just prompt)
         Just prev -> let
             stdin = B.concat inB
             stdout = B.concat outB
@@ -108,7 +117,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
             startTime = case events of
               h : _ -> Rec.timestamp h
               _ -> badStartTime
-          in yield (Rec.ConsoleRecord
+            rec = (Rec.ConsoleRecord
                 command
                 host
                 cwd
@@ -122,6 +131,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
+          in trace (show rec) $ yield rec >> go [] [] [] [] (Just prompt)
 
       mkEvent (E.Debug time cmd pid ppid environment) = 
         Rec.ConsoleEvent time cmd pid ppid environment
