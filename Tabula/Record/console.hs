@@ -8,6 +8,16 @@ module Tabula.Record.Console where
 
   type Env = [(String, String)]
 
+  data ConsoleEvent = ConsoleEvent {
+        timestamp :: UTCTime
+      , subCommand :: String
+      , pid :: Int
+      , ppid :: Int
+      , env :: Env
+  }
+
+  $(deriveJSON defaultOptions ''ConsoleEvent)
+
   data ConsoleRecord = ConsoleRecord {
       command :: String
     , host :: String
@@ -16,15 +26,16 @@ module Tabula.Record.Console where
     , posteriorEnv :: Env
     , startTime :: UTCTime
     , endTime :: UTCTime
-    , stdin :: Maybe B.ByteString
-    , stdout :: Maybe B.ByteString
-    , stderr :: Maybe B.ByteString
+    , stdin :: B.ByteString
+    , stdout :: B.ByteString
+    , stderr :: B.ByteString
     , exitStatus :: Int
+    , events :: [ConsoleEvent]
   }
 
   $(deriveJSON defaultOptions ''ConsoleRecord)
 
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
-    getVersion _ = 3
+    getVersion _ = 4
     getTimestamp = startTime

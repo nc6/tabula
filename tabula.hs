@@ -19,6 +19,7 @@ module Main where
   import System.Exit (exitWith)
   import System.IO (Handle(), hPutStrLn, stdin, stdout, stderr)
   import System.Log.Logger
+  import System.Log.Handler.Simple (fileHandler)
   import System.Posix.IO (fdToHandle)
   import System.Posix.Terminal
   import System.Process
@@ -31,19 +32,22 @@ module Main where
   main = getArgs >>= \case
     "trap" : rest -> trap rest
     "prompt" : rest -> prompt rest
-    _ -> updateGlobalLogger "tabula" (setLevel DEBUG) >> showShell
+    _ -> do
+      logFile <- fileHandler "scratch/log" DEBUG
+      updateGlobalLogger "tabula" (setLevel DEBUG . setHandlers [logFile]) 
+      showShell 1
 
-  showShell :: IO ()
-  showShell = do
+  showShell :: Int -> IO ()
+  showShell bufSize = do
     -- Start two pseudo-terminals. We'll use one for in/err and the other for out
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
     --Tee off all of them
-    inChan <- tee 16 stdin pty1m
-    errChan <- tee 16 pty1m stderr
-    outChan <- tee 16 pty2m stdout
+    inChan <- tee bufSize stdin pty1m
+    errChan <- tee bufSize pty1m stderr
+    outChan <- tee bufSize pty2m stdout
     -- Start listening daemon in background thread
-    soc <- daemon (inChan, outChan, errChan)
+    soc <- daemon (inChan, outChan, errChan) bufSize
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND

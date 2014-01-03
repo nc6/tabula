@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Tabula.Internal.Daemon (daemon, BSChan) where
 
   import Control.Concurrent (forkIO)
@@ -8,6 +9,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
 
   import Data.Aeson (encode, json, fromJSON, Result(..))
   import Data.ByteString (ByteString)
+  import qualified Data.ByteString as B
   import qualified Data.ByteString.Lazy as L
   import Data.Conduit
   import Data.Conduit.Attoparsec (conduitParserEither)
@@ -16,8 +18,10 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Data.Conduit.Network
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
 
+  import Network.BSD (getHostName)
   import Network.Socket
 
+  import System.Log.Logger
   import System.Random (randomRIO)
 
   import qualified Tabula.Internal.Event as E
@@ -27,23 +31,26 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
 
-  daemon :: (BSChan, BSChan, BSChan) -> IO Socket
-  daemon (inC, outC, errC) = do
+  daemon :: (BSChan, BSChan, BSChan) -> Int -> IO Socket
+  daemon (inC, outC, errC) bufSize = do
+    host <- getHostName
+    debugM "tabula.daemon" $ "Host name: " ++ host
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
       (randomRIO (0, 9999999) :: IO Int)
     -- Start up a domain socket to do the listening
     soc <- socket AF_UNIX Stream 0
     bind soc (SockAddrUnix sockAddr)
-    socChan <- listenSocket soc 16
+    socChan <- listenSocket soc bufSize
     -- Merge all channels together
     let inS = sourceTBMChan inC $= DCL.map E.Stdin
         outS = sourceTBMChan outC $= DCL.map E.Stdout
         errS = sourceTBMChan errC $= DCL.map E.Stderr
         socS = sourceTBMChan socChan
-    mergedS <- runResourceT $ mergeSources [inS, outS, errS, socS] 16
+    mergedS <- runResourceT $ mergeSources [inS, outS, errS, socS] bufSize
+    debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
     _ <- forkIO . runResourceT $ mergedS $= 
-      conduitSession $= 
+      conduitSession bufSize host $= 
       DCL.map (encode . record) $=
       DCL.concatMap L.toChunks $$ 
       DCB.sinkFile "scratch/all"
@@ -71,5 +78,50 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Success a -> yield a
         Error s -> error s
 
-  conduitSession :: (MonadIO m, MonadResource m) => Conduit E.Event m Rec.ConsoleRecord
-  conduitSession = undefined
+  -- | Sessionise the event stream to a stream of console records.
+  conduitSession :: (MonadIO m, MonadResource m) => 
+    Int -> String -> Conduit E.Event m Rec.ConsoleRecord
+  conduitSession bufSize host = go [] [] [] [] Nothing
+    where
+      go inB outB errB trapB a = await >>= \case
+        Just (E.Stdin sb) -> let 
+            inB' = if (length inB >= bufSize) then inB else sb : inB
+          in go inB' outB errB trapB a
+        Just (E.Stdout sb) -> let 
+            outB' = if (length outB >= bufSize) then outB else sb : outB
+          in go inB outB' errB trapB a
+        Just (E.Stderr sb) -> let 
+            errB' = if (length errB >= bufSize) then errB else sb : errB
+          in go inB outB errB' trapB a
+        Just (sb @ (E.Debug _ _ _ _ _)) -> go inB outB errB (sb : trapB) a
+        Just (sb @ (E.Prompt _ _ _ _ _)) -> sessionize inB outB errB trapB sb a
+
+      sessionize inB outB errB trapB prompt old = case old of
+        Nothing -> go [] [] [] [] old
+        Just prev -> let
+            stdin = B.concat inB
+            stdout = B.concat outB
+            stderr = B.concat errB
+            E.Prompt badStartTime priorEnv cwd _ _ = prev
+            E.Prompt endTime posteriorEnv _ command exitStatus = prompt
+            events = map mkEvent . reverse $ trapB
+            startTime = case events of
+              h : _ -> Rec.timestamp h
+              _ -> badStartTime
+          in yield (Rec.ConsoleRecord
+                command
+                host
+                cwd
+                priorEnv
+                posteriorEnv
+                startTime
+                endTime
+                (L.fromStrict stdin)
+                (L.fromStrict stdout)
+                (L.fromStrict stderr)
+                exitStatus
+                events 
+             )
+
+      mkEvent (E.Debug time cmd pid ppid environment) = 
+        Rec.ConsoleEvent time cmd pid ppid environment
