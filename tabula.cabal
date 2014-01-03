@@ -68,6 +68,7 @@ executable tabula
   -- Other library packages from which modules are imported.
   build-depends:        base >=4.6 && <4.7
                       , aeson
+                      , attoparsec-conduit
                       , bytestring
                       , conduit
                       , containers
@@ -81,6 +82,7 @@ executable tabula
                       , stm-chans
                       , stm-conduit
                       , time
+                      , transformers
                       , unix
                       , url
   
