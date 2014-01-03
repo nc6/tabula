@@ -27,4 +27,4 @@ module Tabula.Record.Console where
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
     getVersion _ = 3
-    getTimestamp a = startTime a
+    getTimestamp = startTime

@@ -5,7 +5,6 @@ which are invoked from the shell and report back to the collection
 daemon.
 -}
 module Tabula.Internal.Agent (trap, prompt) where
-  --import Control.Monad (unless)
 
   import Data.Aeson (encode)
   import Data.List (intercalate)
@@ -22,7 +21,7 @@ module Tabula.Internal.Agent (trap, prompt) where
   trap :: [String] -> IO ()
   trap args = case args of
     sockAddr : pid : ppid : cmd' -> do
-      let cmd = intercalate " " cmd'
+      let cmd = unwords cmd'
       time <- getCurrentTime
       env <- getEnvironment
       let msg = E.Debug time cmd (read pid) (read ppid) env
@@ -36,7 +35,7 @@ module Tabula.Internal.Agent (trap, prompt) where
   prompt :: [String] -> IO ()
   prompt args = case args of
     sockAddr : exitCode : cmd' -> do
-      let cmd = intercalate " " cmd'
+      let cmd = unwords cmd'
       time <- getCurrentTime
       cwd <- getWorkingDirectory
       env <- getEnvironment

@@ -29,7 +29,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
 
   daemon :: (BSChan, BSChan, BSChan) -> IO Socket
   daemon (inC, outC, errC) = do
-    sockAddr <- fmap (\a -> "/tmp/tabula-" ++ (show a) ++ ".soc")
+    sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
       (randomRIO (0, 9999999) :: IO Int)
     -- Start up a domain socket to do the listening
     soc <- socket AF_UNIX Stream 0

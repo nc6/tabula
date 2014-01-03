@@ -22,9 +22,8 @@ module Tabula.Record where
     getTimestamp :: a -> UTCTime
 
   record :: (Recordable a) => a -> Record
-  record a = (Record 
+  record a = Record 
                 (getNamespace a)
                 (getVersion a)
                 (getTimestamp a)
                 (toJSON a)
-             )

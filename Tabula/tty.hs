@@ -22,7 +22,7 @@ module Tabula.TTY where
       finalise oldAttrs = setTerminalAttributes fd oldAttrs Immediately
 
   setRaw :: (TerminalAttributes -> TerminalAttributes)
-  setRaw oldAttrs = withoutModes rawModes oldAttrs where
+  setRaw = withoutModes rawModes where
     rawModes = [ProcessInput, KeyboardInterrupts, ExtendedFunctions, 
                 EnableEcho, InterruptOnBreak, MapCRtoLF, IgnoreBreak, 
                 IgnoreCR, MapLFtoCR, CheckParity, StripHighBit, 
