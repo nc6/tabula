@@ -15,5 +15,6 @@ module Tabula.Internal.Event where
     | Stderr ByteString
     | Prompt UTCTime Env String String Int -- ^ timestamp env cwd command exitCode
     | Debug UTCTime String Int Int Env -- ^ timestamp command pid ppid environment
-
+    deriving (Show, Eq)
+    
   $(deriveJSON defaultOptions ''Event)

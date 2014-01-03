@@ -14,7 +14,7 @@ module Tabula.Record.Console where
       , pid :: Int
       , ppid :: Int
       , env :: Env
-  }
+  } deriving (Eq, Show)
 
   $(deriveJSON defaultOptions ''ConsoleEvent)
 
@@ -31,7 +31,7 @@ module Tabula.Record.Console where
     , stderr :: B.ByteString
     , exitStatus :: Int
     , events :: [ConsoleEvent]
-  }
+  } deriving (Eq, Show)
 
   $(deriveJSON defaultOptions ''ConsoleRecord)
 
