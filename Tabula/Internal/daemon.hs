@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase,RankNTypes #-}
 module Tabula.Internal.Daemon (daemon, BSChan) where
 
   import Control.Arrow ((>>>))
@@ -6,7 +6,8 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
   import Control.Monad (void)
-  import Control.Monad.IO.Class
+  import Control.Monad.IO.Class (MonadIO (liftIO))
+  import Control.Monad.Trans.Class (lift)
 
   import Data.Aeson (encode, json, fromJSON, Result(..))
   import Data.ByteString (ByteString)
@@ -16,12 +17,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Data.Conduit.Attoparsec (conduitParserEither)
   import qualified Data.Conduit.Binary as DCB
   import qualified Data.Conduit.List as DCL
-  import Data.Conduit.Network
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
   import Debug.Trace (trace, traceShow)
 
   import Network.BSD (getHostName)
-  import Network.Socket
+  import Network.Socket hiding (recv)
+  import Network.Socket.ByteString (recv)
 
   import System.Log.Logger
   import System.Random (randomRIO)
@@ -64,14 +65,25 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
       forkListener chan
       return chan
     where
-      forkListener chan = void . forkIO $ listen soc 1 >> loop where 
-        loop = do
-          (conn, _) <- accept soc
-          runResourceT $ sourceSocket conn $$ parseEvent =$ sinkTBMChan chan
-          close conn
-          loop
+      forkListener chan = void . forkIO $ listen soc 1 >> 
+          (sourceSocket soc $$ parseEvent =$ sinkTBMChan chan)
 
-  parseEvent :: (MonadIO m, MonadResource m) => Conduit ByteString m E.Event
+  sourceSocket :: (MonadIO m) => Socket -> Producer m ByteString
+  sourceSocket sock =
+      loop
+    where
+      loop = do
+        (conn, _) <- lift . liftIO $ accept sock
+        loop' conn
+        lift . liftIO $ close conn
+        loop
+      loop' conn = do
+        bs <- lift . liftIO $ recv conn 4096
+        if B.null bs
+          then return ()
+          else yield bs >> loop' conn
+
+  parseEvent :: (MonadIO m) => Conduit ByteString m E.Event
   parseEvent = 
       conduitParserEither json =$= awaitForever go
     where

@@ -75,7 +75,6 @@ executable tabula
                       , directory
                       , hslogger
                       , network
-                      , network-conduit
                       , process >= 1.2.0
                       , random
                       , resourcet
