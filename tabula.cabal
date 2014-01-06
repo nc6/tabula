@@ -78,6 +78,7 @@ executable tabula
                       , network-conduit
                       , process >= 1.2.0
                       , random
+                      , resourcet
                       , stm
                       , stm-chans
                       , stm-conduit

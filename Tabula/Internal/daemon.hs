@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Tabula.Internal.Daemon (daemon, BSChan) where
 
+  import Control.Arrow ((>>>))
   import Control.Concurrent (forkIO)
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
@@ -17,7 +18,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Data.Conduit.List as DCL
   import Data.Conduit.Network
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
-  import Debug.Trace (trace)
+  import Debug.Trace (trace, traceShow)
 
   import Network.BSD (getHostName)
   import Network.Socket
@@ -47,14 +48,14 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         outS = sourceTBMChan outC $= DCL.map E.Stdout
         errS = sourceTBMChan errC $= DCL.map E.Stderr
         socS = sourceTBMChan socChan
-    mergedS <- runResourceT $ mergeSources [inS, outS, errS, socS] bufSize
+        mergedS = mergeSources [inS, outS, errS, socS] bufSize
     debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
-    _ <- forkIO . runResourceT $ mergedS $=
-      conduitSession bufSize host $= 
-      DCL.map (encode . record) $=
-      DCL.concatMap L.toChunks $$ 
-      DCB.sinkFile "scratch/all"
+    _ <- forkIO . runResourceT $ mergedS >>= 
+      \a -> a $$ conduitSession bufSize host =$= 
+        DCL.map (encode . record) =$=
+        DCL.concatMap L.toChunks =$= 
+        DCB.sinkFile "scratch/all"
     return soc
 
   listenSocket :: Socket -> Int -> IO EChan
@@ -79,35 +80,33 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Success a -> yield a
         Error s -> error s
 
+  traceId :: (Show a) => a -> a
+  traceId a = traceShow a a 
+
   -- | Sessionise the event stream to a stream of console records.
   conduitSession :: (MonadIO m, MonadResource m) => 
     Int -> String -> Conduit E.Event m Rec.ConsoleRecord
   conduitSession bufSize host = go [] [] [] [] Nothing
     where
-      go inB outB errB trapB oldP = await >>= \case
+      go inB outB errB trapB oldP = await >>= (traceId >>> \case
         Just (E.Stdin sb) -> let 
             inB' = if (length inB >= bufSize) then inB else sb : inB
-          in -- trace ("Stdin: " ++ show sb) $
-              go inB' outB errB trapB oldP
+          in go inB' outB errB trapB oldP
         Just (E.Stdout sb) -> let 
             outB' = if (length outB >= bufSize) then outB else sb : outB
-          in -- trace ("Stdout: " ++ show sb) $ 
-              go inB outB' errB trapB oldP
+          in go inB outB' errB trapB oldP
         Just (E.Stderr sb) -> let 
             errB' = if (length errB >= bufSize) then errB else sb : errB
-          in -- trace ("Stderr: " ++ show sb) $ 
-              go inB outB errB' trapB oldP
+          in go inB outB errB' trapB oldP
         Just (sb @ (E.Debug _ _ _ _ _)) -> 
-          trace ("Debug event: " ++ show sb) 
             go inB outB errB (sb : trapB) oldP
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
-          trace ("Prompt event: " ++ show sb)
             sessionize inB outB errB trapB sb oldP
-        Nothing -> trace "Nothing!\n" $ return ()
+        Nothing -> return ())
 
       sessionize inB outB errB trapB prompt old = case old of
         Nothing -> trace "No previous prompt." $ go [] [] [] [] (Just prompt)
-        Just prev -> let
+        Just prev -> trace "Previous prompt." $ let
             stdin = B.concat inB
             stdout = B.concat outB
             stderr = B.concat errB
