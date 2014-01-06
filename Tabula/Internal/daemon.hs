@@ -1,7 +1,6 @@
 {-# LANGUAGE LambdaCase,RankNTypes #-}
 module Tabula.Internal.Daemon (daemon, BSChan) where
 
-  import Control.Arrow ((>>>))
   import Control.Concurrent (forkIO)
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
@@ -18,7 +17,6 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Data.Conduit.Binary as DCB
   import qualified Data.Conduit.List as DCL
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
-  import Debug.Trace (trace, traceShow)
 
   import Network.BSD (getHostName)
   import Network.Socket hiding (recv)
@@ -92,15 +90,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Success a -> yield a
         Error s -> error s
 
-  traceId :: (Show a) => a -> a
-  traceId a = traceShow a a 
-
   -- | Sessionise the event stream to a stream of console records.
   conduitSession :: (MonadIO m, MonadResource m) => 
     Int -> String -> Conduit E.Event m Rec.ConsoleRecord
   conduitSession bufSize host = go [] [] [] [] Nothing
     where
-      go inB outB errB trapB oldP = await >>= (traceId >>> \case
+      go inB outB errB trapB oldP = await >>= \case
         Just (E.Stdin sb) -> let 
             inB' = if (length inB >= bufSize) then inB else sb : inB
           in go inB' outB errB trapB oldP
@@ -114,11 +109,11 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
             go inB outB errB (sb : trapB) oldP
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
             sessionize inB outB errB trapB sb oldP
-        Nothing -> return ())
+        Nothing -> return ()
 
       sessionize inB outB errB trapB prompt old = case old of
-        Nothing -> trace "No previous prompt." $ go [] [] [] [] (Just prompt)
-        Just prev -> trace "Previous prompt." $ let
+        Nothing -> go [] [] [] [] (Just prompt)
+        Just prev -> let
             stdin = B.concat inB
             stdout = B.concat outB
             stderr = B.concat errB
@@ -142,7 +137,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
-          in trace (show rec) $ yield rec >> go [] [] [] [] (Just prompt)
+          in yield rec >> go [] [] [] [] (Just prompt)
 
       mkEvent (E.Debug time cmd pid ppid environment) = 
         Rec.ConsoleEvent time cmd pid ppid environment
