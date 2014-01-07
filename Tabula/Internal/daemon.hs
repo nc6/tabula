@@ -71,9 +71,9 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
       loop
     where
       loop = do
-        (conn, _) <- lift . liftIO $ accept sock
+        (conn, _) <- liftIO $ accept sock
         loop' conn
-        lift . liftIO $ close conn
+        liftIO $ close conn
         loop
       loop' conn = do
         bs <- lift . liftIO $ recv conn 4096
