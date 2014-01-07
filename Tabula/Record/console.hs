@@ -5,15 +5,14 @@ module Tabula.Record.Console where
   import Data.Time.Clock
 
   import Tabula.Record
-
-  type Env = [(String, String)]
+  import qualified Tabula.Record.Environment as Env
 
   data ConsoleEvent = ConsoleEvent {
         timestamp :: UTCTime
       , subCommand :: String
       , pid :: Int
       , ppid :: Int
-      , env :: Env
+      , env :: Env.EnvChange
   } deriving (Eq, Show)
 
   $(deriveJSON defaultOptions ''ConsoleEvent)
@@ -22,8 +21,8 @@ module Tabula.Record.Console where
       command :: String
     , host :: String
     , workingDirectory :: FilePath
-    , priorEnv :: Env
-    , posteriorEnv :: Env
+    , priorEnv :: Env.Env
+    , posteriorEnv :: Env.Env
     , startTime :: UTCTime
     , endTime :: UTCTime
     , stdin :: B.ByteString
@@ -37,5 +36,5 @@ module Tabula.Record.Console where
 
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
-    getVersion _ = 4
+    getVersion _ = 5
     getTimestamp = startTime

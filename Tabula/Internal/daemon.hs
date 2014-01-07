@@ -17,6 +17,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Data.Conduit.Binary as DCB
   import qualified Data.Conduit.List as DCL
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
+  import Data.Time.Clock
 
   import Network.BSD (getHostName)
   import Network.Socket hiding (recv)
@@ -28,6 +29,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Tabula.Internal.Event as E
   import Tabula.Record (record)
   import qualified Tabula.Record.Console as Rec
+  import qualified Tabula.Record.Environment as Env
 
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
@@ -90,44 +92,62 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Success a -> yield a
         Error s -> error s
 
+  data SessionState = Session {
+      ssIn :: [ByteString]
+    , ssOut :: [ByteString]
+    , ssErr :: [ByteString]
+    , ssTrap :: [Rec.ConsoleEvent]
+    , ssPromptStart :: UTCTime
+    , ssInitialEnv :: Env.Env
+    , ssWd :: FilePath
+    , ssCurrentEnv :: Env.Env
+  } | NoSession
+
   -- | Sessionise the event stream to a stream of console records.
   conduitSession :: (MonadIO m, MonadResource m) => 
     Int -> String -> Conduit E.Event m Rec.ConsoleRecord
-  conduitSession bufSize host = go [] [] [] [] Nothing
+  conduitSession bufSize host = go NoSession
     where
-      go inB outB errB trapB oldP = await >>= \case
+      go NoSession = await >>= \case
+        -- No session, only care about prompt events
+        Just (E.Prompt st env cwd _ _) ->
+          go $ Session [] [] [] [] st env cwd env
+        _ -> go NoSession
+      go ss = await >>= \case
         Just (E.Stdin sb) -> let 
+            inB = ssIn ss
             inB' = if (length inB >= bufSize) then inB else sb : inB
-          in go inB' outB errB trapB oldP
-        Just (E.Stdout sb) -> let 
+          in go $ ss { ssIn = inB' }
+        Just (E.Stdout sb) -> let
+            outB = ssOut ss 
             outB' = if (length outB >= bufSize) then outB else sb : outB
-          in go inB outB' errB trapB oldP
-        Just (E.Stderr sb) -> let 
+          in go $ ss { ssOut = outB' }
+        Just (E.Stderr sb) -> let
+            errB = ssErr ss
             errB' = if (length errB >= bufSize) then errB else sb : errB
-          in go inB outB errB' trapB oldP
-        Just (sb @ (E.Debug _ _ _ _ _)) -> 
-            go inB outB errB (sb : trapB) oldP
+          in go $ ss { ssErr = errB' }
+        Just (sb @ (E.Debug _ _ _ _ env)) -> let
+              trapB = ssTrap ss
+              debugEvent = mkEvent sb (ssCurrentEnv ss)
+            in go $ ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
-            sessionize inB outB errB trapB sb oldP
+            sessionize ss sb
         Nothing -> return ()
 
-      sessionize inB outB errB trapB prompt old = case old of
-        Nothing -> go [] [] [] [] (Just prompt)
-        Just prev -> let
-            stdin = B.concat inB
-            stdout = B.concat outB
-            stderr = B.concat errB
-            E.Prompt badStartTime priorEnv cwd _ _ = prev
-            E.Prompt endTime posteriorEnv _ command exitStatus = prompt
-            events = map mkEvent . reverse $ trapB
+      sessionize ss sb = let
+            stdin = B.concat (ssIn ss)
+            stdout = B.concat (ssOut ss)
+            stderr = B.concat (ssErr ss)
+            E.Prompt endTime posteriorEnv nwd command exitStatus = sb
+            events = reverse (ssTrap ss)
             startTime = case events of
               h : _ -> Rec.timestamp h
-              _ -> badStartTime
+              _ -> (ssPromptStart ss)
             rec = (Rec.ConsoleRecord
                 command
                 host
-                cwd
-                priorEnv
+                (ssWd ss)
+                (ssInitialEnv ss)
                 posteriorEnv
                 startTime
                 endTime
@@ -137,7 +157,8 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
-          in yield rec >> go [] [] [] [] (Just prompt)
+          in yield rec >> 
+            (go $ Session [] [] [] [] endTime posteriorEnv nwd posteriorEnv)
 
-      mkEvent (E.Debug time cmd pid ppid environment) = 
-        Rec.ConsoleEvent time cmd pid ppid environment
+      mkEvent (E.Debug time cmd pid ppid environment) oldEnv = 
+        Rec.ConsoleEvent time cmd pid ppid (Env.diff oldEnv environment)
