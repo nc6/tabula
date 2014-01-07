@@ -31,6 +31,7 @@ module Tabula.Record.Environment (Env, EnvChange, diff) where
       (f,t) = map2 Map.fromList (from, to)
       insertions = map (uncurry Insert) . Map.assocs $ Map.difference t f
       deletions = map Delete . Map.keys $ Map.difference f t
-      modifications = Map.elems $ Map.intersectionWithKey Modify f t
+      modifications = filter (\(Modify _ a b) -> a /= b) . Map.elems $ 
+        Map.intersectionWithKey Modify f t
     in insertions ++ deletions ++ modifications
 

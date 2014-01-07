@@ -135,9 +135,9 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Nothing -> return ()
 
       sessionize ss sb = let
-            stdin = B.concat (ssIn ss)
-            stdout = B.concat (ssOut ss)
-            stderr = B.concat (ssErr ss)
+            stdin = B.concat . reverse $ (ssIn ss)
+            stdout = B.concat . reverse $ (ssOut ss)
+            stderr = B.concat . reverse $ (ssErr ss)
             E.Prompt endTime posteriorEnv nwd command exitStatus = sb
             events = reverse (ssTrap ss)
             startTime = case events of
@@ -148,7 +148,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 host
                 (ssWd ss)
                 (ssInitialEnv ss)
-                posteriorEnv
+                (Env.diff (ssInitialEnv ss) posteriorEnv)
                 startTime
                 endTime
                 (L.fromStrict stdin)

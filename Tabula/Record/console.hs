@@ -12,7 +12,7 @@ module Tabula.Record.Console where
       , subCommand :: String
       , pid :: Int
       , ppid :: Int
-      , env :: Env.EnvChange
+      , envChanges :: Env.EnvChange
   } deriving (Eq, Show)
 
   $(deriveJSON defaultOptions ''ConsoleEvent)
@@ -22,7 +22,7 @@ module Tabula.Record.Console where
     , host :: String
     , workingDirectory :: FilePath
     , priorEnv :: Env.Env
-    , posteriorEnv :: Env.Env
+    , posteriorEnv :: Env.EnvChange
     , startTime :: UTCTime
     , endTime :: UTCTime
     , stdin :: B.ByteString
@@ -36,5 +36,5 @@ module Tabula.Record.Console where
 
   instance Recordable ConsoleRecord where
     getNamespace _ = "tabula::consoleRecord"
-    getVersion _ = 5
+    getVersion _ = 6
     getTimestamp = startTime
