@@ -71,6 +71,7 @@ module Main where
                         sn ++ " $BASHPID $PPID $BASH_COMMAND' DEBUG"
       debugM "tabula" $ "Trap command:\n\t" ++ trapCommand
       hPutStrLn pty1m trapCommand
+      hPutStrLn pty1m "clear"
       -- Wait for exit
       waitForProcess ph
     -- Clean up the socket
