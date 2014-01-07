@@ -8,7 +8,8 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Control.Monad.IO.Class (MonadIO (liftIO))
   import Control.Monad.Trans.Class (lift)
 
-  import Data.Aeson (encode, json, fromJSON, Result(..))
+  import Data.Aeson (json, fromJSON, Result(..))
+  import Data.Aeson.Encode.Pretty (encodePretty)
   import Data.ByteString (ByteString)
   import qualified Data.ByteString as B
   import qualified Data.ByteString.Lazy as L
@@ -54,7 +55,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     -- Sink to a session list
     _ <- forkIO . runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host =$= 
-        DCL.map (encode . record) =$=
+        DCL.map (encodePretty . record) =$=
         DCL.concatMap L.toChunks =$= 
         DCB.sinkFile "scratch/all"
     return soc
