@@ -70,12 +70,14 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
       forkListener chan
       return chan
     where
-      forkListener chan = void . forkIO $ listen soc 1 >> 
+      forkListener chan = void . forkIO . runResourceT $ 
           (sourceSocket soc $$ parseEvent =$ sinkTBMChan chan)
           
-  sourceSocket :: (MonadIO m) => Socket -> Producer m ByteString
-  sourceSocket sock =
-      addCleanup (const $ liftIO . close $ sock) $ loop
+  sourceSocket :: (MonadIO m, MonadResource m) => Socket -> Producer m ByteString
+  sourceSocket sock = bracketP
+      (listen sock 1)
+      (\() -> close $ sock)
+      (\() -> loop)
     where
       loop = (liftIO $ isListening sock) >>= \case
         True -> do 
