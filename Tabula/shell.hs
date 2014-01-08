@@ -26,8 +26,8 @@ module Tabula.Shell where
   import Tabula.TTY
   import Tabula.Internal.Daemon
 
-  showShell :: Int -> IO ()
-  showShell bufSize = do
+  showShell :: FilePath -> Int -> IO ()
+  showShell recordFile bufSize = do
     -- Start two pseudo-terminals. We'll use one for in/err and the other for out
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
@@ -37,7 +37,7 @@ module Tabula.Shell where
     outChan <- tee bufSize pty2m stdout
     stopChan <- atomically $ newTBMChan 1 -- ^ Just contains the 'Stop' message
     -- Start listening daemon in background thread
-    (done, soc) <- daemon (inChan, outChan, errChan, stopChan) bufSize
+    (done, soc) <- daemon recordFile (inChan, outChan, errChan, stopChan) bufSize
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND

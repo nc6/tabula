@@ -24,6 +24,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Network.Socket hiding (recv)
   import Network.Socket.ByteString (recv)
 
+  import System.IO (hClose, openBinaryFile, IOMode(AppendMode))
   import System.Log.Logger
   import System.Random (randomRIO)
 
@@ -36,9 +37,9 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
 
-  daemon :: (BSChan, BSChan, BSChan, FlagChan) -> Int 
+  daemon :: FilePath -> (BSChan, BSChan, BSChan, FlagChan) -> Int 
          -> IO (MVar (), Socket) -- ^ closing mvar, socket
-  daemon (inC, outC, errC, flagC) bufSize = do
+  daemon recordFile (inC, outC, errC, flagC) bufSize = do
     host <- getHostName
     debugM "tabula.daemon" $ "Host name: " ++ host
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
@@ -57,11 +58,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
     x <- newEmptyMVar
+    let fileSink = bracketP (openBinaryFile recordFile AppendMode) hClose DCB.sinkHandle
     _ <- forkFinally (runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host =$= 
         DCL.map (encodePretty . record) =$=
         DCL.concatMap L.toChunks =$= 
-        DCB.sinkFile "scratch/all") (\_ -> putMVar x ())
+        fileSink) (\_ -> putMVar x ())
     return (x, soc)
 
   listenSocket :: Socket -> Int -> IO EChan
