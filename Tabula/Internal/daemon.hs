@@ -1,12 +1,12 @@
 {-# LANGUAGE LambdaCase,RankNTypes #-}
 module Tabula.Internal.Daemon (daemon, BSChan) where
 
-  import Control.Concurrent (forkIO)
+  import Control.Concurrent (forkIO, forkFinally)
+  import Control.Concurrent.MVar (MVar(), newEmptyMVar, putMVar)
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
   import Control.Monad (void)
   import Control.Monad.IO.Class (MonadIO (liftIO))
-  import Control.Monad.Trans.Class (lift)
 
   import Data.Aeson (json, fromJSON, Result(..))
   import Data.Aeson.Encode.Pretty (encodePretty)
@@ -32,11 +32,13 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Tabula.Record.Console as Rec
   import qualified Tabula.Record.Environment as Env
 
+  type FlagChan = TBMChan ()
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
 
-  daemon :: (BSChan, BSChan, BSChan) -> Int -> IO Socket
-  daemon (inC, outC, errC) bufSize = do
+  daemon :: (BSChan, BSChan, BSChan, FlagChan) -> Int 
+         -> IO (MVar (), Socket) -- ^ closing mvar, socket
+  daemon (inC, outC, errC, flagC) bufSize = do
     host <- getHostName
     debugM "tabula.daemon" $ "Host name: " ++ host
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
@@ -49,16 +51,18 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     let inS = sourceTBMChan inC $= DCL.map E.Stdin
         outS = sourceTBMChan outC $= DCL.map E.Stdout
         errS = sourceTBMChan errC $= DCL.map E.Stderr
+        stopS = sourceTBMChan flagC $= DCL.map (\() -> E.Stop)
         socS = sourceTBMChan socChan
-        mergedS = mergeSources [inS, outS, errS, socS] bufSize
+        mergedS = mergeSources [inS, outS, errS, stopS, socS] bufSize
     debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
-    _ <- forkIO . runResourceT $ mergedS >>= 
+    x <- newEmptyMVar
+    _ <- forkFinally (runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host =$= 
         DCL.map (encodePretty . record) =$=
         DCL.concatMap L.toChunks =$= 
-        DCB.sinkFile "scratch/all"
-    return soc
+        DCB.sinkFile "scratch/all") (\_ -> putMVar x ())
+    return (x, soc)
 
   listenSocket :: Socket -> Int -> IO EChan
   listenSocket soc bufSize = do
@@ -68,18 +72,20 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     where
       forkListener chan = void . forkIO $ listen soc 1 >> 
           (sourceSocket soc $$ parseEvent =$ sinkTBMChan chan)
-
+          
   sourceSocket :: (MonadIO m) => Socket -> Producer m ByteString
   sourceSocket sock =
-      loop
+      addCleanup (const $ liftIO . close $ sock) $ loop
     where
-      loop = do
-        (conn, _) <- liftIO $ accept sock
-        loop' conn
-        liftIO $ close conn
-        loop
+      loop = (liftIO $ isListening sock) >>= \case
+        True -> do 
+          (conn, _) <- liftIO $ accept sock
+          loop' conn
+          liftIO $ close conn
+          loop
+        False -> return ()
       loop' conn = do
-        bs <- lift . liftIO $ recv conn 4096
+        bs <- liftIO $ recv conn 4096
         if B.null bs
           then return ()
           else yield bs >> loop' conn
@@ -113,6 +119,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         -- No session, only care about prompt events
         Just (E.Prompt st env cwd _ _) ->
           go $ Session [] [] [] [] st env cwd env
+        Just (E.Stop) -> return ()
         _ -> go NoSession
       go ss = await >>= \case
         Just (E.Stdin sb) -> let 
@@ -133,6 +140,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
             in go $ ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
             sessionize ss sb
+        Just (E.Stop) -> return ()
         Nothing -> return ()
 
       sessionize ss sb = let

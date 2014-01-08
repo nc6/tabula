@@ -1,8 +1,9 @@
 module Tabula.Shell where
   import Control.Arrow
   import Control.Concurrent (forkIO)
+  import Control.Concurrent.MVar (takeMVar)
   import Control.Concurrent.STM (atomically)
-  import Control.Concurrent.STM.TBMChan (newTBMChan)
+  import Control.Concurrent.STM.TBMChan (newTBMChan, writeTBMChan)
   import Control.Monad (ap, join)
 
   import Data.Conduit
@@ -34,8 +35,9 @@ module Tabula.Shell where
     inChan <- tee bufSize stdin pty1m
     errChan <- tee bufSize pty1m stderr
     outChan <- tee bufSize pty2m stdout
+    stopChan <- atomically $ newTBMChan 1 -- ^ Just contains the 'Stop' message
     -- Start listening daemon in background thread
-    soc <- daemon (inChan, outChan, errChan) bufSize
+    (done, soc) <- daemon (inChan, outChan, errChan, stopChan) bufSize
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
@@ -62,8 +64,13 @@ module Tabula.Shell where
       hPutStrLn pty1m "clear"
       -- Wait for exit
       waitForProcess ph
+    socFile <- socketName soc
+    -- Close the pipes
+    atomically $ writeTBMChan stopChan ()
+    -- Wait for daemon thread to exit
+    takeMVar done
     -- Clean up the socket
-    cleanSocket soc
+    removeFile socFile
     exitWith exitStatus
     where 
       openPtyHandles = do
@@ -77,7 +84,6 @@ module Tabula.Shell where
         case name of 
           SockAddrUnix sn -> return sn
           _ -> error "No valid socket address."
-      cleanSocket soc = socketName soc >>= removeFile
 
   tee :: Int -> Handle -> Handle -> IO BSChan
   tee bufSize from to = do

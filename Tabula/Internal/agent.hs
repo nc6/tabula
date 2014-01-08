@@ -29,7 +29,7 @@ module Tabula.Internal.Agent (trap, prompt) where
       soc <- socket AF_UNIX Stream 0
       connect soc (SockAddrUnix sockAddr)
       sendAll soc . encode $ msg
-      sClose soc
+      close soc
     _ -> error $ "Incorrect arguments specified:\n" ++ intercalate "\n\t" args
 
   prompt :: [String] -> IO ()
@@ -44,5 +44,5 @@ module Tabula.Internal.Agent (trap, prompt) where
       soc <- socket AF_UNIX Stream 0
       connect soc (SockAddrUnix sockAddr)
       sendAll soc . encode $ msg
-      sClose soc
+      close soc
     _ -> error $ "Incorrect arguments specified:\n" ++ intercalate "\n\t" args
