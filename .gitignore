@@ -2,3 +2,4 @@
 dist/
 scratch/
 cabal.sandbox.config
+.DS_Store
