@@ -76,6 +76,7 @@ executable tabula
                       , directory
                       , hslogger
                       , network
+                      , optparse-applicative
                       , process >= 1.2.0
                       , random
                       , resourcet
@@ -86,6 +87,7 @@ executable tabula
                       , transformers
                       , unix
                       , url
+                      , vinyl >= 0.2.1
   
   -- Directories containing source files.
   -- hs-source-dirs:      

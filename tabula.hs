@@ -7,6 +7,7 @@ module Main where
   import System.Log.Handler.Simple (fileHandler)
 
   import Tabula.Internal.Agent
+  import Tabula.Options
   import Tabula.Shell (showShell)
 
   main :: IO ()
