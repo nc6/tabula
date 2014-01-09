@@ -33,11 +33,17 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import qualified Tabula.Record.Console as Rec
   import qualified Tabula.Record.Environment as Env
 
+  {- | Control channel to allow the main thread to control the conduit. At
+       the moment this simply is used to send a single 'shutdown' message when
+       the shell closes.
+  -}
   type FlagChan = TBMChan ()
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
 
-  daemon :: FilePath -> (BSChan, BSChan, BSChan, FlagChan) -> Int 
+  daemon :: FilePath -- ^ Path to the file to write out to.
+         -> (BSChan, BSChan, BSChan, FlagChan) -- ^ Channels (in, out, err, control)
+         -> Int -- ^ Buffer size - maybe should just make this a function somewhere?
          -> IO (MVar (), Socket) -- ^ closing mvar, socket
   daemon recordFile (inC, outC, errC, flagC) bufSize = do
     host <- getHostName

@@ -35,9 +35,10 @@ module Tabula.Shell where
     inChan <- tee bufSize stdin pty1m
     errChan <- tee bufSize pty1m stderr
     outChan <- tee bufSize pty2m stdout
-    stopChan <- atomically $ newTBMChan 1 -- ^ Just contains the 'Stop' message
+    stopChan <- atomically $ newTBMChan 1 -- Just contains the 'Stop' message
+    let channels = (inChan, errChan, outChan, stopChan)
     -- Start listening daemon in background thread
-    (done, soc) <- daemon recordFile (inChan, outChan, errChan, stopChan) bufSize
+    (done, soc) <- daemon recordFile channels bufSize
     debugM "tabula" $ "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
