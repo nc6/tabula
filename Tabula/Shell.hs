@@ -39,7 +39,7 @@ module Tabula.Shell where
     let channels = (inChan, errChan, outChan, stopChan)
     -- Start listening daemon in background thread
     (done, soc) <- daemon recordFile channels bufSize
-    debugM "tabula" $ "Setting parent terminal to raw mode."
+    debugM "tabula" "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
       tabula <- getExecutablePath
