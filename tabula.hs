@@ -1,6 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 module Main where
- 
+  import Control.Monad (unless)
+
+  import Data.Vinyl
+
+  import Options.Applicative (execParser)
+
   import System.Directory
   import System.Environment (getArgs)
   import System.Log.Logger
@@ -10,22 +15,33 @@ module Main where
   import Tabula.Options
   import Tabula.Shell (showShell)
 
+  bufferSize :: Int
+  bufferSize = 16
+
   main :: IO ()
   main = getArgs >>= \case
     "trap" : rest -> trap rest
     "prompt" : rest -> prompt rest
-    name : [] -> startProject name
-    [] -> startProject "default"
+    _ -> execParser options >>= run
 
-  startProject :: String -> IO ()
-  startProject proj = do
-    workDir <- ensureWorkDir
-    logFile <- fileHandler (workDir ++ "/log.debug") DEBUG
-    updateGlobalLogger "tabula" (setLevel DEBUG . setHandlers [logFile]) 
-    showShell (workDir ++ "/" ++ proj) 64
+  run :: PlainRec Options -> IO ()
+  run opts = do
+    workDir <- ensureDataDir
+    unless (rGet quiet opts) $ do
+      logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
+      updateGlobalLogger "tabula" (
+        setLevel (rGet verbosity opts) . setHandlers [logFile])
+    case (rGet command opts) of
+      Version -> putStrLn "Version 0.1"
+      Default defOpts -> startProject defOpts
 
-  ensureWorkDir :: IO FilePath
-  ensureWorkDir = do
+  startProject :: PlainRec DefaultOptions -> IO ()
+  startProject defOpts = do
+    let logDestination = (rGet db defOpts) ++ "/" ++ (rGet project defOpts)
+    showShell logDestination bufferSize
+
+  ensureDataDir :: IO FilePath
+  ensureDataDir = do
     workDir <- getAppUserDataDirectory "tabula"
     createDirectoryIfMissing False workDir
     return workDir
