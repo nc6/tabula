@@ -74,11 +74,11 @@ executable tabula
   
   -- Other library packages from which modules are imported.
   build-depends:        base >=4.6 && <4.7
-                      , aeson
+                      , aeson < 0.7
                       , aeson-pretty
                       , attoparsec-conduit
                       , bytestring
-                      , conduit
+                      , conduit >= 1.0.9.3
                       , containers
                       , directory
                       , hslogger
