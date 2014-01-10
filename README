@@ -1,4 +1,7 @@
-Tabula is tool for recording and analysing command line sessions. It is similar to
-the Unix 'script' tool, but also records details such as command exit status, snippets
-from stdin and stdout. Rather than recording to a file, commands are sent to a listening
-server which collates resources from multiple terminals.
+Tabula is tool for recording and analysing command line sessions. 
+
+At a basic level, it's quite similar to the Unix 'script' tool. However, rather than just recording everything that's typed or displayed, it tries to capture much more meaningful information about the actions that are being performed. It explicitly captures commands that are run, whether they succeed or not, the directory and environment they were run in, and the input and output consumed and produced.
+
+In the future, tabula will support a centralised collection system that allows people on multiple hosts, or multiple terminals on the same machine, to be be recorded in a single place and provide an overview of all the work that was done on a project.
+
+Output is produced in JSON format for easy analysis.
