@@ -58,8 +58,15 @@ executable tabula
   -- Modules included in this executable, other than Main.
   other-modules:        Tabula.Record
                       , Tabula.Record.Console
+                      , Tabula.Record.Environment
                       , Tabula.Destination
                       , Tabula.Destination.File
+                      , Tabula.Internal.Agent
+                      , Tabula.Internal.Daemon
+                      , Tabula.Internal.Event
+                      , Tabula.Options
+                      , Tabula.Shell
+                      , Tabula.TTY
                       , Tabula.Strings
   
   -- LANGUAGE extensions used by modules in this package.
