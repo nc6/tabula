@@ -41,10 +41,10 @@ module Tabula.Options (
   -- | Specify which project 
   project = Field :: "project" ::: String
   -- | Project database. At the moment, this is just a directory.
-  db = Field :: "db" ::: String
+  db = Field :: "db" ::: Maybe String
 
   -- Default options --
-  type DefaultOptions = ["resume" ::: Bool, "project" ::: String, "db" ::: String]
+  type DefaultOptions = ["resume" ::: Bool, "project" ::: String, "db" ::: Maybe String]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
 
@@ -58,16 +58,15 @@ module Tabula.Options (
   -- Shared options
 
   projectOption :: Parser String
-  projectOption = argument str (metavar "PROJECT") 
+  projectOption = argument str (metavar "PROJECT" <> value "default") 
 
   -- Option groups
   defaultOptions :: Rec DefaultOptions Parser
   defaultOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
                 <+> project <-: projectOption
-                <+> db <-: (strOption (long "destination"
+                <+> db <-: optional (strOption (long "destination"
                             <> short 'd'
                             <> metavar "DESTINATION"
-                            <> value "$HOME/.tabula"
                             <> help "Directory to write logs to."))
 
   commonOptions :: Rec CommonOptions Parser

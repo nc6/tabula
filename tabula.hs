@@ -2,6 +2,7 @@
 module Main where
   import Control.Monad (unless)
 
+  import Data.Maybe (fromMaybe)
   import Data.Vinyl
 
   import Options.Applicative (execParser)
@@ -14,6 +15,8 @@ module Main where
   import Tabula.Internal.Agent
   import Tabula.Options
   import Tabula.Shell (showShell)
+
+  import Debug.Trace
 
   bufferSize :: Int
   bufferSize = 16
@@ -33,11 +36,13 @@ module Main where
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
       Version -> putStrLn "Version 0.1"
-      Default defOpts -> startProject defOpts
+      Default defOpts -> startProject workDir defOpts
 
-  startProject :: PlainRec DefaultOptions -> IO ()
-  startProject defOpts = do
-    let logDestination = (rGet db defOpts) ++ "/" ++ (rGet project defOpts)
+  startProject :: FilePath -> PlainRec DefaultOptions -> IO ()
+  startProject workDir defOpts = do
+    let logDestination = (fromMaybe workDir (rGet db defOpts)) 
+                            ++ "/" ++ (rGet project defOpts)
+    traceIO $"\n\n\n\n" ++ logDestination ++ "\n\n\n\n"
     showShell logDestination bufferSize
 
   ensureDataDir :: IO FilePath
