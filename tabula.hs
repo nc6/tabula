@@ -16,8 +16,6 @@ module Main where
   import Tabula.Options
   import Tabula.Shell (showShell)
 
-  import Debug.Trace
-
   main :: IO ()
   main = getArgs >>= \case
     "trap" : rest -> trap rest
@@ -39,7 +37,6 @@ module Main where
   startProject workDir defOpts = do
     let logDestination = (fromMaybe workDir (rGet db defOpts)) 
                             ++ "/" ++ (rGet project defOpts)
-    traceIO $"\n\n\n\n" ++ logDestination ++ "\n\n\n\n"
     showShell logDestination (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
