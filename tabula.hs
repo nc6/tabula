@@ -18,9 +18,6 @@ module Main where
 
   import Debug.Trace
 
-  bufferSize :: Int
-  bufferSize = 16
-
   main :: IO ()
   main = getArgs >>= \case
     "trap" : rest -> trap rest
@@ -43,7 +40,7 @@ module Main where
     let logDestination = (fromMaybe workDir (rGet db defOpts)) 
                             ++ "/" ++ (rGet project defOpts)
     traceIO $"\n\n\n\n" ++ logDestination ++ "\n\n\n\n"
-    showShell logDestination bufferSize
+    showShell logDestination (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do

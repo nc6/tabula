@@ -9,6 +9,7 @@ module Tabula.Options (
     , project
     , resume
     , db
+    , bufferSize
     , Command(..)
     , Options
     , DefaultOptions
@@ -44,14 +45,19 @@ module Tabula.Options (
   db = Field :: "db" ::: Maybe String
 
   -- Default options --
-  type DefaultOptions = ["resume" ::: Bool, "project" ::: String, "db" ::: Maybe String]
+  type DefaultOptions = [ "resume" ::: Bool
+                          , "project" ::: String
+                          , "db" ::: Maybe String
+                          , "bufferSize" ::: Int]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
+  -- | Set buffer size
+  bufferSize = Field :: "bufferSize" ::: Int
 
   --------------- Parsers ------------------
 
   version :: Parser (a -> a)
-  version = infoOption "Tabula version 0.0.1"
+  version = infoOption "Tabula version 0.1.0.1"
     (  long "version"
     <> help "Print version information" )
   
@@ -68,6 +74,10 @@ module Tabula.Options (
                             <> short 'd'
                             <> metavar "DESTINATION"
                             <> help "Directory to write logs to."))
+                <+> bufferSize <-: option (long "bufferSize"
+                                             <> metavar "SIZE"
+                                             <> value 16
+                                             <> help "Set buffer size (in multiples of 4096B)")
 
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 
