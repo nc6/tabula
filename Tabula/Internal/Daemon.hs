@@ -5,7 +5,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Control.Concurrent.MVar (MVar(), newEmptyMVar, putMVar)
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
-  import Control.Monad (void)
+  import Control.Monad (unless, void)
   import Control.Monad.IO.Class (MonadIO (liftIO))
 
   import Data.Aeson (json, fromJSON, Result(..))
@@ -43,13 +43,16 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
 
   daemon :: FilePath -- ^ Path to the file to write out to.
          -> (BSChan, BSChan, BSChan, FlagChan) -- ^ Channels (in, out, err, control)
+         -> (String -> [String]) -- Ignored commands (takes the socket name)
          -> Int -- ^ Buffer size - maybe should just make this a function somewhere?
          -> IO (MVar (), Socket) -- ^ closing mvar, socket
-  daemon recordFile (inC, outC, errC, flagC) bufSize = do
+  daemon recordFile (inC, outC, errC, flagC) ignoredCommands bufSize = do
     host <- getHostName
     debugM "tabula.daemon" $ "Host name: " ++ host
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
       (randomRIO (0, 9999999) :: IO Int)
+    mapM_ (\i -> debugM "tabula.daemon" $ "Ignored command: " ++ i) $ 
+      ignoredCommands sockAddr
     -- Start up a domain socket to do the listening
     soc <- socket AF_UNIX Stream 0
     bind soc (SockAddrUnix sockAddr)
@@ -65,8 +68,9 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     -- Sink to a session list
     x <- newEmptyMVar
     let fileSink = bracketP (openBinaryFile recordFile AppendMode) hClose DCB.sinkHandle
+        cmdFilter e = elem e $ ignoredCommands sockAddr
     _ <- forkFinally (runResourceT $ mergedS >>= 
-      \a -> a $$ conduitSession bufSize host =$= 
+      \a -> a $$ conduitSession bufSize host cmdFilter =$= 
         DCL.map (encodePretty . record) =$=
         DCL.concatMap L.toChunks =$= 
         fileSink) (\_ -> putMVar x ())
@@ -122,8 +126,8 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
 
   -- | Sessionise the event stream to a stream of console records.
   conduitSession :: (MonadIO m, MonadResource m) => 
-    Int -> String -> Conduit E.Event m Rec.ConsoleRecord
-  conduitSession bufSize host = go NoSession
+    Int -> String -> (String -> Bool) -> Conduit E.Event m Rec.ConsoleRecord
+  conduitSession bufSize host cmdFilter = go NoSession
     where
       go NoSession = await >>= \case
         -- No session, only care about prompt events
@@ -144,10 +148,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
             errB = ssErr ss
             errB' = if (length errB >= bufSize) then errB else sb : errB
           in go $ ss { ssErr = errB' }
-        Just (sb @ (E.Debug _ _ _ _ env)) -> let
-              trapB = ssTrap ss
-              debugEvent = mkEvent sb (ssCurrentEnv ss)
-            in go $ ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
+        Just (sb @ (E.Debug _ cmd _ _ env)) -> let
+            trapB = ssTrap ss
+            debugEvent = mkEvent sb (ssCurrentEnv ss)
+          in case cmd of
+            x | cmdFilter x -> go ss
+            _ -> go $ ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
             sessionize ss sb
         Just (E.Stop) -> return ()
@@ -176,8 +182,8 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
-          in yield rec >> 
-            (go $ Session [] [] [] [] endTime posteriorEnv nwd posteriorEnv)
+          in unless (cmdFilter $ Rec.command rec) $ yield rec 
+            >> (go $ Session [] [] [] [] endTime posteriorEnv nwd posteriorEnv)
 
       mkEvent (E.Debug time cmd pid ppid environment) oldEnv = 
         Rec.ConsoleEvent time cmd pid ppid (Env.diff oldEnv environment)
