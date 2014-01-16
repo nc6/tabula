@@ -43,7 +43,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
 
   daemon :: FilePath -- ^ Path to the file to write out to.
          -> (BSChan, BSChan, BSChan, FlagChan) -- ^ Channels (in, out, err, control)
-         -> (String -> [String]) -- Ignored commands (takes the socket name)
+         -> [String] -- Ignored commands
          -> Int -- ^ Buffer size - maybe should just make this a function somewhere?
          -> IO (MVar (), Socket) -- ^ closing mvar, socket
   daemon recordFile (inC, outC, errC, flagC) ignoredCommands bufSize = do
@@ -52,7 +52,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
       (randomRIO (0, 9999999) :: IO Int)
     mapM_ (\i -> debugM "tabula.daemon" $ "Ignored command: " ++ i) $ 
-      ignoredCommands sockAddr
+      ignoredCommands
     -- Start up a domain socket to do the listening
     soc <- socket AF_UNIX Stream 0
     bind soc (SockAddrUnix sockAddr)
@@ -68,7 +68,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     -- Sink to a session list
     x <- newEmptyMVar
     let fileSink = bracketP (openBinaryFile recordFile AppendMode) hClose DCB.sinkHandle
-        cmdFilter e = elem e $ ignoredCommands sockAddr
+        cmdFilter e = elem e $ ignoredCommands
     _ <- forkFinally (runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host cmdFilter =$= 
         DCL.map (encodePretty . record) =$=

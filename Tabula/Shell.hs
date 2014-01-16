@@ -40,19 +40,21 @@ module Tabula.Shell where
     outChan <- tee bufSize pty2m stdout
     stopChan <- atomically $ newTBMChan 1 -- Just contains the 'Stop' message
     let channels = (inChan, errChan, outChan, stopChan)
-        promptCommand sn = tabula ++ " prompt " ++ sn ++ 
-                            " $? $(history 1)"
-        trapCommand sn = "trap '" ++ tabula ++ " trap " ++
-                        sn ++ " $BASHPID $PPID $BASH_COMMAND' DEBUG"
+        promptCommand = tabula ++ " prompt $? $(history 1)"
+        trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
     -- Start listening daemon in background thread
     (done, soc) <- daemon recordFile channels 
-                          (\sn -> [promptCommand sn, trapCommand sn]) bufSize
+                    [promptCommand, trapCommand] bufSize
     debugM "tabula" "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
       -- Configure PROMPT_COMMAND
       sn <- socketName soc
-      let newEnv = Map.toAscList $ Map.insert "PROMPT_COMMAND" (promptCommand sn) oldEnv
-      debugM "tabula" $ "Prompt command:\n\t" ++ (promptCommand sn)
+      let newEnv = Map.toAscList 
+                    . Map.insert "PROMPT_COMMAND" promptCommand
+                    . Map.insert "TABULA_PORT" sn 
+                    $ oldEnv
+      debugM "tabula" $ "Trap command:\n\t" ++ trapCommand
+      debugM "tabula" $ "Prompt command:\n\t" ++ promptCommand
       -- Display a shell
       myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
       (_,_,_,ph) <- createProcess $ (proc myShell ["-il"]) {
@@ -62,9 +64,7 @@ module Tabula.Shell where
         , env = Just newEnv
         , delegate_ctlc = True
       }
-      -- Configure debug trap
-      debugM "tabula" $ "Trap command:\n\t" ++ trapCommand sn
-      hPutStrLn pty1m $ trapCommand sn
+      hPutStrLn pty1m $ trapCommand
       hPutStrLn pty1m "clear"
       -- Wait for exit
       waitForProcess ph
