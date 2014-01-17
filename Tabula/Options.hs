@@ -76,7 +76,7 @@ module Tabula.Options (
                             <> help "Directory to write logs to."))
                 <+> bufferSize <-: option (long "bufferSize"
                                              <> metavar "SIZE"
-                                             <> value 4
+                                             <> value 64
                                              <> help "Set buffer size (in multiples of 4096B)")
 
   commonOptions :: Rec CommonOptions Parser
