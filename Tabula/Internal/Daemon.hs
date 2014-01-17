@@ -83,26 +83,25 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
       return chan
     where
       forkListener chan = void . forkIO . runResourceT $ 
-          (sourceSocket soc $$ parseEvent =$ sinkTBMChan chan)
-          
-  sourceSocket :: (MonadIO m, MonadResource m) => Socket -> Producer m ByteString
-  sourceSocket sock = bracketP
-      (listen sock 1)
-      (\() -> close $ sock)
-      (\() -> loop)
-    where
-      loop = (liftIO $ isListening sock) >>= \case
-        True -> do 
-          (conn, _) <- liftIO $ accept sock
-          loop' conn
-          liftIO $ close conn
-          loop
-        False -> return ()
-      loop' conn = do
-        bs <- liftIO $ recv conn 4096
-        if B.null bs
-          then return ()
-          else yield bs >> loop' conn
+          (sourceSocket soc $$ parseEvent =$ sinkTBMChan chan) 
+      sourceSocket :: (MonadIO m, MonadResource m) => Socket -> Producer m ByteString
+      sourceSocket sock = bracketP
+          (listen sock 1)
+          (\() -> close $ sock)
+          (\() -> loop)
+        where
+          loop = (liftIO $ isListening sock) >>= \case
+            True -> do 
+              (conn, _) <- liftIO $ accept sock
+              loop' conn
+              liftIO $ close conn
+              loop
+            False -> return ()
+          loop' conn = do
+            bs <- liftIO $ recv conn 4096
+            if B.null bs
+              then return ()
+              else yield bs >> loop' conn
 
   parseEvent :: (MonadIO m) => Conduit ByteString m E.Event
   parseEvent = 
