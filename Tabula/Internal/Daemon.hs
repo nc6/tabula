@@ -9,13 +9,11 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Control.Monad.IO.Class (MonadIO (liftIO))
 
   import Data.Aeson (json, fromJSON, Result(..))
-  import Data.Aeson.Encode.Pretty (encodePretty)
   import Data.ByteString (ByteString)
   import qualified Data.ByteString as B
   import qualified Data.ByteString.Lazy as L
   import Data.Conduit
   import Data.Conduit.Attoparsec (conduitParserEither)
-  import qualified Data.Conduit.Binary as DCB
   import qualified Data.Conduit.List as DCL
   import Data.Conduit.TMChan (sinkTBMChan, sourceTBMChan, mergeSources)
   import Data.Time.Clock
@@ -24,10 +22,10 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Network.Socket hiding (recv)
   import Network.Socket.ByteString (recv)
 
-  import System.IO (hClose, openBinaryFile, IOMode(AppendMode))
   import System.Log.Logger
   import System.Random (randomRIO)
 
+  import Tabula.Destination
   import qualified Tabula.Internal.Event as E
   import Tabula.Record (record)
   import qualified Tabula.Record.Console as Rec
@@ -41,12 +39,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   type EChan = TBMChan E.Event
   type BSChan = TBMChan ByteString
 
-  daemon :: FilePath -- ^ Path to the file to write out to.
+  daemon :: Destination -- ^ Path to the file to write out to.
          -> (BSChan, BSChan, BSChan, FlagChan) -- ^ Channels (in, out, err, control)
          -> [String] -- Ignored commands
          -> Int -- ^ Buffer size - maybe should just make this a function somewhere?
          -> IO (MVar (), Socket) -- ^ closing mvar, socket
-  daemon recordFile (inC, outC, errC, flagC) ignoredCommands bufSize = do
+  daemon destination (inC, outC, errC, flagC) ignoredCommands bufSize = do
     host <- getHostName
     debugM "tabula.daemon" $ "Host name: " ++ host
     sockAddr <- fmap (\a -> "/tmp/tabula-" ++ show a ++ ".soc")
@@ -67,12 +65,12 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     debugM "tabula.daemon" $ "Merged all sources."
     -- Sink to a session list
     x <- newEmptyMVar
-    let fileSink = bracketP (openBinaryFile recordFile AppendMode) hClose DCB.sinkHandle
-        cmdFilter e = elem e $ ignoredCommands
+    let cmdFilter e = elem e $ ignoredCommands
+        fileSink = recordSink destination
     _ <- forkFinally (runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host cmdFilter =$= 
-        DCL.map (encodePretty . record) =$=
-        DCL.concatMap L.toChunks =$= 
+        DCL.map (record) =$=
+        --DCL.concatMap L.toChunks =$= 
         fileSink) (\_ -> putMVar x ())
     return (x, soc)
 

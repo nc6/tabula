@@ -23,6 +23,7 @@ module Tabula.Shell where
   import System.Posix.Terminal
   import System.Process
 
+  import Tabula.Destination.File (fileDestination)
   import Tabula.TTY
   import Tabula.Internal.Daemon
 
@@ -43,7 +44,7 @@ module Tabula.Shell where
         promptCommand = tabula ++ " prompt $? $(history 1)"
         trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
     -- Start listening daemon in background thread
-    (done, soc) <- daemon recordFile channels 
+    (done, soc) <- daemon (fileDestination recordFile) channels 
                     [promptCommand, trapCommand] bufSize
     debugM "tabula" "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
