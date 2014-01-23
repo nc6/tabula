@@ -23,12 +23,12 @@ module Tabula.Shell where
   import System.Posix.Terminal
   import System.Process
 
-  import Tabula.Destination.File (fileDestination)
+  import Tabula.Destination
   import Tabula.TTY
   import Tabula.Internal.Daemon
 
-  showShell :: FilePath -> Int -> IO ()
-  showShell recordFile bufSize = do
+  showShell :: Destination -> Int -> IO ()
+  showShell dest bufSize = do
     -- Fetch basic information
     tabula <- getExecutablePath
     oldEnv <- fmap Map.fromList getEnvironment
@@ -44,7 +44,7 @@ module Tabula.Shell where
         promptCommand = tabula ++ " prompt $? $(history 1)"
         trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
     -- Start listening daemon in background thread
-    (done, soc) <- daemon (fileDestination recordFile) channels 
+    (done, soc) <- daemon dest channels 
                     [promptCommand, trapCommand] bufSize
     debugM "tabula" "Setting parent terminal to raw mode."
     exitStatus <- getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do

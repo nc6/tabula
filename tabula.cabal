@@ -80,6 +80,7 @@ executable tabula
                       , conduit >= 1.0.9.3
                       , containers
                       , directory
+                      , hedis
                       , hslogger
                       , network
                       , optparse-applicative

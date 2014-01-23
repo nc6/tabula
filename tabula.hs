@@ -4,6 +4,7 @@ module Main where
 
   import Data.Maybe (fromMaybe)
   import Data.Vinyl
+  import Database.Redis (defaultConnectInfo)
 
   import Options.Applicative (execParser)
 
@@ -12,6 +13,8 @@ module Main where
   import System.Log.Logger
   import System.Log.Handler.Simple (fileHandler)
 
+  import Tabula.Destination.File (fileDestination)
+  import Tabula.Destination.Redis
   import Tabula.Internal.Agent
   import Tabula.Options
   import Tabula.Shell (showShell)
@@ -35,8 +38,10 @@ module Main where
 
   startProject :: FilePath -> PlainRec DefaultOptions -> IO ()
   startProject workDir defOpts = do
-    let logDestination = (fromMaybe workDir (rGet db defOpts)) 
-                            ++ "/" ++ (rGet project defOpts)
+    let 
+        --logDestination = fileDestination $ (fromMaybe workDir (rGet db defOpts)) 
+        --                    ++ "/" ++ (rGet project defOpts)
+        logDestination = redisDestination defaultConnectInfo (rGet project defOpts)
     showShell logDestination (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
