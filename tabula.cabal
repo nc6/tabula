@@ -67,7 +67,6 @@ executable tabula
                       , Tabula.Options
                       , Tabula.Shell
                       , Tabula.TTY
-                      , Tabula.Strings
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
