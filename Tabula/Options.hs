@@ -66,7 +66,7 @@ module Tabula.Options (
   --------------- Parsers ------------------
 
   version :: Parser (a -> a)
-  version = infoOption "Tabula version 0.1.1.0"
+  version = infoOption "Tabula version 0.1.1.1"
     (  long "version"
     <> help "Print version information" )
   

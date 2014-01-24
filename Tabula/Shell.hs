@@ -115,5 +115,5 @@ module Tabula.Shell where
     chan <- atomically $ newTBMChan bufSize
     _ <- forkIO . runResourceT $ DCB.sourceHandle from
           $= DCB.conduitHandle to -- Sink contents to out Handle
-          $$ sinkTBMChan chan
+          $$ sinkTBMChan chan True
     return chan
