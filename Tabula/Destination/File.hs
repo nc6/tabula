@@ -6,25 +6,26 @@ module Tabula.Destination.File where
   import qualified Data.Conduit.List as DCL
   
   --import System.Directory
+  import System.FilePath ((</>))
   import System.IO (hClose, openBinaryFile, IOMode(AppendMode))
 
   import Tabula.Destination
 
   -- | A file destination. Only supports appending records.
-  fileDestination :: FilePath -> Destination
-  fileDestination fp = Destination {
+  fileDestination :: FilePath -> String -> Destination
+  fileDestination fp proj = Destination {
       recordSink = DCL.map encodePretty =$= 
         DCL.concatMap L.toChunks =$= bracketP 
-                        (openBinaryFile fp AppendMode) 
+                        (openBinaryFile (fp </> proj) AppendMode) 
                         hClose 
                         DCB.sinkHandle
     , getLastRecord = undefined
     , recordSource = undefined
   }
 
-  directoryDestination :: FilePath -> String -> Destination
-  directoryDestination dir proj = Destination {
-      recordSink = undefined
-    , getLastRecord = undefined
-    , recordSource = undefined
-  }
+  --directoryDestination :: FilePath -> String -> Destination
+  --directoryDestination dir proj = Destination {
+  --    recordSink = undefined
+  --  , getLastRecord = undefined
+  --  , recordSource = undefined
+  --}

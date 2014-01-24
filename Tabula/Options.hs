@@ -13,14 +13,23 @@ module Tabula.Options (
     , Command(..)
     , Options
     , DefaultOptions
+    , readDestination
   ) where
   import Data.Char (toUpper)
   import Data.Vinyl
+  import Database.Redis (PortID(PortNumber))
+
+  import Network.Socket (PortNumber(PortNum))
 
   import Options.Applicative hiding (command)
   import qualified Options.Applicative as Opt
 
   import System.Log (Priority(..))
+
+  import Tabula.Destination
+  import Tabula.Destination.File
+  import Tabula.Destination.Redis
+  import qualified Text.Parsec as P
 
   -------------- Options ------------------
 
@@ -42,12 +51,12 @@ module Tabula.Options (
   -- | Specify which project 
   project = Field :: "project" ::: String
   -- | Project database. At the moment, this is just a directory.
-  db = Field :: "db" ::: Maybe String
+  db = Field :: "db" ::: Maybe (Project -> Destination)
 
   -- Default options --
   type DefaultOptions = [ "resume" ::: Bool
                           , "project" ::: String
-                          , "db" ::: Maybe String
+                          , "db" ::: Maybe (Project -> Destination)
                           , "bufferSize" ::: Int]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
@@ -70,10 +79,11 @@ module Tabula.Options (
   defaultOptions :: Rec DefaultOptions Parser
   defaultOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
                 <+> project <-: projectOption
-                <+> db <-: optional (strOption (long "destination"
+                <+> db <-: optional (nullOption (long "destination"
                             <> short 'd'
                             <> metavar "DESTINATION"
-                            <> help "Directory to write logs to."))
+                            <> reader readDestination
+                            <> help "Destination to write logs to."))
                 <+> bufferSize <-: option (long "bufferSize"
                                              <> metavar "SIZE"
                                              <> value 64
@@ -112,3 +122,25 @@ module Tabula.Options (
     "ALERT" -> return ALERT
     "EMERGENCY" -> return EMERGENCY 
     x -> fail $ "Invalid logging level specified: " ++ x
+
+  readDestination :: Monad m => String -> m (Project -> Destination)
+  readDestination s = let
+      protoSep = P.string "://"
+      path = P.many1 (P.noneOf ":")
+      fileDest = P.string "file" >> protoSep >> do
+        p <- path
+        return $ fileDestination p
+      redisDest =  P.string "redis" >> protoSep >> do
+        host <- P.option (connectHost defaultConnectInfo) $ 
+          P.many1 (P.alphaNum <|> P.char '.')
+        port <- P.option (connectPort defaultConnectInfo) $ 
+          liftA (PortNumber . PortNum . read) (P.char ':' >> P.many1 (P.digit))
+        let connInfo = defaultConnectInfo {
+            connectHost = host
+          , connectPort = port
+        }
+        return $ redisDestination connInfo
+      destinations = fileDest <|> redisDest
+    in case P.parse destinations "Destination" s of
+      Left err -> fail $ "Invalid destination: " ++ show err
+      Right x -> return x

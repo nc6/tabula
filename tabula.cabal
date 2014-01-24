@@ -80,10 +80,12 @@ executable tabula
                       , conduit >= 1.0.9.3
                       , containers
                       , directory
+                      , filepath
                       , hedis
                       , hslogger
                       , network
                       , optparse-applicative
+                      , parsec
                       , process >= 1.2.0
                       , random
                       , resourcet

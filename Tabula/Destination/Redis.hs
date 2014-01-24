@@ -1,12 +1,12 @@
 -- Redis destination for tabula
 module Tabula.Destination.Redis (
       redisDestination
-    , ConnectInfo
+    , defaultConnectInfo
+    , ConnectInfo(..)
   ) where
   import Control.Monad.IO.Class
 
   import Data.Aeson
-  import Data.Aeson.Encode.Pretty (encodePretty)
   import qualified Data.ByteString.Char8 as B
   import qualified Data.ByteString.Lazy as L
   import Data.Conduit
@@ -31,7 +31,7 @@ module Tabula.Destination.Redis (
       (\conn -> loop conn)
     where 
       loop conn = awaitForever $ \rec -> let 
-          recS = B.concat . L.toChunks $ encodePretty rec
+          recS = B.concat . L.toChunks $ encode rec
         in liftIO . runRedis conn $ do
              lpush project [recS]
 
