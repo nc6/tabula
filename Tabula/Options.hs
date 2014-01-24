@@ -55,9 +55,10 @@ module Tabula.Options (
 
   -- Default options --
   type DefaultOptions = [ "resume" ::: Bool
-                          , "project" ::: String
                           , "db" ::: Maybe (Project -> Destination)
-                          , "bufferSize" ::: Int]
+                          , "bufferSize" ::: Int
+                          , "project" ::: String
+                        ]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
   -- | Set buffer size
@@ -78,7 +79,6 @@ module Tabula.Options (
   -- Option groups
   defaultOptions :: Rec DefaultOptions Parser
   defaultOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
-                <+> project <-: projectOption
                 <+> db <-: optional (nullOption (long "destination"
                             <> short 'd'
                             <> metavar "DESTINATION"
@@ -88,6 +88,7 @@ module Tabula.Options (
                                              <> metavar "SIZE"
                                              <> value 64
                                              <> help "Set buffer size (in multiples of 4096B)")
+                <+> project <-: projectOption
 
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 
