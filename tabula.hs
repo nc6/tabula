@@ -39,7 +39,7 @@ module Main where
       defaultDestination = fileDestination workDir
       logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
                           (rGet project defOpts)
-    in showShell logDestination (rGet bufferSize defOpts)
+    in showShell logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do

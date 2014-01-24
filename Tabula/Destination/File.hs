@@ -19,13 +19,6 @@ module Tabula.Destination.File where
                         (openBinaryFile (fp </> proj) AppendMode) 
                         hClose 
                         DCB.sinkHandle
-    , getLastRecord = undefined
+    , getLastRecord = return Nothing
     , recordSource = undefined
   }
-
-  --directoryDestination :: FilePath -> String -> Destination
-  --directoryDestination dir proj = Destination {
-  --    recordSink = undefined
-  --  , getLastRecord = undefined
-  --  , recordSource = undefined
-  --}

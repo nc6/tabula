@@ -1,4 +1,5 @@
 module Tabula.Shell where
+  import Control.Applicative (liftA)
   import Control.Arrow
   import Control.Concurrent (forkIO)
   import Control.Concurrent.MVar (takeMVar)
@@ -6,9 +7,11 @@ module Tabula.Shell where
   import Control.Concurrent.STM.TBMChan (newTBMChan, writeTBMChan)
   import Control.Monad (ap, join)
 
+  import Data.Aeson (Result(..), fromJSON)
   import Data.Conduit
   import qualified Data.Conduit.Binary as DCB
   import Data.Conduit.TMChan (sinkTBMChan)
+  import Data.Foldable (for_)
   import qualified Data.Map as Map
   import Data.Maybe (fromMaybe)
 
@@ -24,18 +27,29 @@ module Tabula.Shell where
   import System.Process
 
   import Tabula.Destination
+  import Tabula.Record (entry)
+  import Tabula.Record.Console (priorEnv, posteriorEnv, workingDirectory)
+  import Tabula.Record.Environment
   import Tabula.TTY
   import Tabula.Internal.Daemon
 
-  showShell :: Destination -> Int -> IO ()
-  showShell dest bufSize = do
+  showShell :: Destination -> Bool -> Int -> IO ()
+  showShell dest resume bufSize = do
     -- Fetch basic information
     tabula <- getExecutablePath
-    oldEnv <- fmap Map.fromList getEnvironment
+    oldRecord <- if resume then 
+        liftA (>>= fromJSONMaybe . entry) $ getLastRecord dest 
+      else 
+        return Nothing
+    -- Set the old environment
+    oldEnv <- fmap Map.fromList $ case oldRecord of
+      Just e ->
+        return $ indifferentMerge (posteriorEnv e) (priorEnv e)
+      Nothing -> getEnvironment
     -- Start two pseudo-terminals. We'll use one for in/err and the other for out
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
-    --Tee off all of them
+    -- Tee off all of them
     inChan <- tee bufSize stdin pty1m
     errChan <- tee bufSize pty1m stderr
     outChan <- tee bufSize pty2m stdout
@@ -66,6 +80,9 @@ module Tabula.Shell where
         , delegate_ctlc = True
       }
       hPutStrLn pty1m $ trapCommand
+      -- Change directory
+      for_ oldRecord $ hPutStrLn pty1m . ("cd " ++) . workingDirectory
+      -- Clear the screen
       hPutStrLn pty1m "clear"
       -- Wait for exit
       waitForProcess ph
@@ -89,6 +106,9 @@ module Tabula.Shell where
         case name of 
           SockAddrUnix sn -> return sn
           _ -> error "No valid socket address."
+      fromJSONMaybe a = case fromJSON a of
+        Error _ -> Nothing
+        Success b -> Just b
 
   tee :: Int -> Handle -> Handle -> IO BSChan
   tee bufSize from to = do
