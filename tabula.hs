@@ -31,7 +31,6 @@ module Main where
       updateGlobalLogger "tabula" (
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
-      Version -> putStrLn "Version 0.1"
       Default defOpts -> startProject workDir defOpts
 
   startProject :: FilePath -> PlainRec DefaultOptions -> IO ()

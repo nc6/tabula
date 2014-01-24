@@ -34,7 +34,6 @@ module Tabula.Options (
   -------------- Options ------------------
 
   data Command = Default (PlainRec DefaultOptions)
-                | Version
 
   command = Field :: "command" ::: Command
 
