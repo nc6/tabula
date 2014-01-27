@@ -1,9 +1,11 @@
 -- Redis destination for tabula
+{-# LANGUAGE LambdaCase #-}
 module Tabula.Destination.Redis (
       redisDestination
     , defaultConnectInfo
     , ConnectInfo(..)
   ) where
+  import Control.Exception (handleJust)
   import Control.Monad (void)
   import Control.Monad.IO.Class
 
@@ -33,8 +35,12 @@ module Tabula.Destination.Redis (
     where 
       loop conn = awaitForever $ \rec -> let 
           recS = B.concat . L.toChunks $ encode rec
-        in liftIO . runRedis conn $ do
-             lpush project [recS]
+        in liftIO . ensureConnection . runRedis conn $ do
+             void $ lpush project [recS]
+      ensureConnection = handleJust (\case 
+          ConnectionLost -> Just ()
+          _ -> Nothing)
+        (\_ -> return ())
 
   -- Redis source. At the moment, just get all posts (should probably chunk nicely!)
   redisSource :: ConnectInfo -> B.ByteString -> Source (ResourceT IO) Record
