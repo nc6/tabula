@@ -178,7 +178,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
-          in unless (cmdFilter $ Rec.command rec) $ yield rec 
+          in (unless (cmdFilter $ Rec.command rec) $ yield rec)
             >> (go $ Session [] [] [] [] endTime posteriorEnv nwd posteriorEnv)
 
       mkEvent (E.Debug time cmd pid ppid environment) oldEnv = 

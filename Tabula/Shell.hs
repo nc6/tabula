@@ -55,7 +55,7 @@ module Tabula.Shell where
     outChan <- tee bufSize pty2m stdout
     stopChan <- atomically $ newTBMChan 1 -- Just contains the 'Stop' message
     let channels = (inChan, errChan, outChan, stopChan)
-        promptCommand = tabula ++ " prompt $? $(history 1)"
+        promptCommand = tabula ++ " prompt $? $(history 1 | tr -s ' ' | cut -d' ' -f3-)"
         trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
     -- Start listening daemon in background thread
     (done, soc) <- daemon dest channels 
