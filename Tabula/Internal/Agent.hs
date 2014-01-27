@@ -28,11 +28,7 @@ module Tabula.Internal.Agent (trap, prompt) where
           time <- getCurrentTime
           env <- getEnvironment
           let msg = E.Debug time cmd (read pid) (read ppid) env
-          -- connect to socket, send the entire thing
-          soc <- socket AF_UNIX Stream 0
-          connect soc (SockAddrUnix sockAddr)
-          sendAll soc . encode $ msg
-          close soc
+          sendMsg sockAddr msg
         Nothing -> error $ 
           "TABULA_PORT not specified. Are you sure you are running a tabula session?"
     _ -> error $ "Incorrect arguments specified:\n" ++ intercalate "\n\t" args
@@ -48,11 +44,14 @@ module Tabula.Internal.Agent (trap, prompt) where
           cwd <- getWorkingDirectory
           env <- getEnvironment
           let msg = E.Prompt time env cwd cmd (read exitCode)
-          -- connect to socket, send the entire thing
-          soc <- socket AF_UNIX Stream 0
-          connect soc (SockAddrUnix sockAddr)
-          sendAll soc . encode $ msg
-          close soc
+          sendMsg sockAddr msg
         Nothing -> error $ 
           "TABULA_PORT not specified. Are you sure you are running a tabula session?"
     _ -> error $ "Incorrect arguments specified:\n" ++ intercalate "\n\t" args
+
+  sendMsg :: FilePath -> E.Event -> IO ()
+  sendMsg sockAddr msg = do
+    soc <- socket AF_UNIX Stream 0
+    connect soc (SockAddrUnix sockAddr)
+    sendAll soc . encode $ msg
+    close soc
