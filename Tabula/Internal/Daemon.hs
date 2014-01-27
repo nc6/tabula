@@ -70,7 +70,6 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
     _ <- forkFinally (runResourceT $ mergedS >>= 
       \a -> a $$ conduitSession bufSize host cmdFilter =$= 
         DCL.map (record) =$=
-        --DCL.concatMap L.toChunks =$= 
         fileSink) (\_ -> putMVar x ())
     return (x, soc)
 
@@ -148,9 +147,9 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
         Just (sb @ (E.Debug _ cmd _ _ env)) -> let
             trapB = ssTrap ss
             debugEvent = mkEvent sb (ssCurrentEnv ss)
-          in case cmd of
-            x | cmdFilter x -> go ss
-            _ -> go $ ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
+          in go $ case cmd of
+            x | cmdFilter x -> ss
+            _ -> ss {ssTrap = (debugEvent : trapB),  ssCurrentEnv = env }
         Just (sb @ (E.Prompt _ _ _ _ _)) -> 
             sessionize ss sb
         Just (E.Stop) -> return ()
