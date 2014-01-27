@@ -4,6 +4,7 @@ module Tabula.Destination.Redis (
     , defaultConnectInfo
     , ConnectInfo(..)
   ) where
+  import Control.Monad (void)
   import Control.Monad.IO.Class
 
   import Data.Aeson
@@ -27,7 +28,7 @@ module Tabula.Destination.Redis (
   redisSink :: ConnectInfo -> B.ByteString -> Sink Record (ResourceT IO) ()
   redisSink connInfo project = bracketP
       (connect connInfo)
-      (\_ -> return ())
+      (\conn -> void $ runRedis conn quit)
       (\conn -> loop conn)
     where 
       loop conn = awaitForever $ \rec -> let 
@@ -39,7 +40,7 @@ module Tabula.Destination.Redis (
   redisSource :: ConnectInfo -> B.ByteString -> Source (ResourceT IO) Record
   redisSource connInfo project = bracketP
       (connect connInfo)
-      (\_ -> return ())
+      (\conn -> void $ runRedis conn quit)
       (\conn -> stream conn)
     where
       stream conn = do
