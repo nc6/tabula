@@ -19,8 +19,6 @@ module Tabula.Options (
   import Data.Vinyl
   import Database.Redis (PortID(PortNumber))
 
-  import Network.Socket (PortNumber(PortNum))
-
   import Options.Applicative hiding (command)
   import qualified Options.Applicative as Opt
 
@@ -34,6 +32,7 @@ module Tabula.Options (
   -------------- Options ------------------
 
   data Command = Default (PlainRec DefaultOptions)
+               | Cat (PlainRec CatOptions)
 
   command = Field :: "command" ::: Command
 
@@ -48,20 +47,25 @@ module Tabula.Options (
 
   -- Shared options --
   -- | Specify which project 
-  project = Field :: "project" ::: String
+  type T_project = "project" ::: String
+  project = Field :: T_project
   -- | Project database. At the moment, this is just a directory.
-  db = Field :: "db" ::: Maybe (Project -> Destination)
+  type T_db = "db" ::: Maybe (Project -> Destination)
+  db = Field :: T_db
 
   -- Default options --
   type DefaultOptions = [ "resume" ::: Bool
-                          , "db" ::: Maybe (Project -> Destination)
+                          , T_db
                           , "bufferSize" ::: Int
-                          , "project" ::: String
+                          , T_project
                         ]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
   -- | Set buffer size
   bufferSize = Field :: "bufferSize" ::: Int
+
+  -- | Cat options
+  type CatOptions = [ T_db, T_project ]
 
   --------------- Parsers ------------------
 
@@ -89,6 +93,14 @@ module Tabula.Options (
                                              <> help "Set buffer size (in multiples of 4096B)")
                 <+> project <-: projectOption
 
+  catOptions :: Rec CatOptions Parser
+  catOptions = db <-: optional (nullOption (long "destination"
+                            <> short 'd'
+                            <> metavar "DESTINATION"
+                            <> reader readDestination
+                            <> help "Destination to read logs from."))
+              <+> project <-: projectOption
+
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 
                                             <> short 'V' 
@@ -103,9 +115,13 @@ module Tabula.Options (
         <> progDesc "Open a recorded shell session for a specific project.")
     where
       commands = subparser (
-          Opt.command "start" (
-            info (fmap ((command =:) . Default) $ dist defaultOptions) 
-              (progDesc "Start or resume a project session."))
+            Opt.command "start" (
+              info (fmap ((command =:) . Default) $ dist defaultOptions) 
+                (progDesc "Start or resume a project session."))
+            <> Opt.command "cat" (
+              info (fmap ((command =:) . Cat) $ dist catOptions)
+                (progDesc "Print a project session to stdout.")
+            )
           )
       (<++>) a b = liftA2 (<+>) a b
 
@@ -134,7 +150,7 @@ module Tabula.Options (
         host <- P.option (connectHost defaultConnectInfo) $ 
           P.many1 (P.alphaNum <|> P.char '.')
         port <- P.option (connectPort defaultConnectInfo) $ 
-          liftA (PortNumber . PortNum . read) (P.char ':' >> P.many1 (P.digit))
+          liftA (PortNumber . fromIntegral . read) (P.char ':' >> P.many1 (P.digit))
         let connInfo = defaultConnectInfo {
             connectHost = host
           , connectPort = port

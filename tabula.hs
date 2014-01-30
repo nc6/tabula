@@ -12,6 +12,8 @@ module Main where
   import System.Log.Logger
   import System.Log.Handler.Simple (fileHandler)
 
+  import Tabula.Command.Cat
+  import Tabula.Destination (Destination, Project)
   import Tabula.Destination.File (fileDestination)
   import Tabula.Internal.Agent
   import Tabula.Options
@@ -26,16 +28,18 @@ module Main where
   run :: PlainRec Options -> IO ()
   run opts = do
     workDir <- ensureDataDir
+    let defaultDestination = fileDestination workDir
     unless (rGet quiet opts) $ do
       logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
       updateGlobalLogger "tabula" (
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
-      Default defOpts -> startProject workDir defOpts
+      Default defOpts -> startProject defaultDestination defOpts
+      Cat catOpts -> catSession $ (fromMaybe defaultDestination (rGet db catOpts)) 
+                          (rGet project catOpts)
 
-  startProject :: FilePath -> PlainRec DefaultOptions -> IO ()
-  startProject workDir defOpts = let
-      defaultDestination = fileDestination workDir
+  startProject :: (Project -> Destination) -> PlainRec DefaultOptions -> IO ()
+  startProject defaultDestination defOpts = let
       logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
                           (rGet project defOpts)
     in showShell logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
