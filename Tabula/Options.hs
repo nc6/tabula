@@ -12,7 +12,7 @@ module Tabula.Options (
     , bufferSize
     , Command(..)
     , Options
-    , DefaultOptions
+    , RecordOptions
     , readDestination
   ) where
   import Data.Char (toUpper)
@@ -31,7 +31,7 @@ module Tabula.Options (
 
   -------------- Options ------------------
 
-  data Command = Default (PlainRec DefaultOptions)
+  data Command = Record (PlainRec RecordOptions)
                | Cat (PlainRec CatOptions)
 
   command = Field :: "command" ::: Command
@@ -54,7 +54,7 @@ module Tabula.Options (
   db = Field :: T_db
 
   -- Default options --
-  type DefaultOptions = [ "resume" ::: Bool
+  type RecordOptions = [ "resume" ::: Bool
                           , T_db
                           , "bufferSize" ::: Int
                           , T_project
@@ -80,8 +80,8 @@ module Tabula.Options (
   projectOption = argument str (metavar "PROJECT" <> value "default") 
 
   -- Option groups
-  defaultOptions :: Rec DefaultOptions Parser
-  defaultOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
+  recordOptions :: Rec RecordOptions Parser
+  recordOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
                 <+> db <-: optional (nullOption (long "destination"
                             <> short 'd'
                             <> metavar "DESTINATION"
@@ -116,7 +116,7 @@ module Tabula.Options (
     where
       commands = subparser (
             Opt.command "start" (
-              info (fmap ((command =:) . Default) $ dist defaultOptions) 
+              info (fmap ((command =:) . Record) $ dist recordOptions) 
                 (progDesc "Start or resume a project session."))
             <> Opt.command "cat" (
               info (fmap ((command =:) . Cat) $ dist catOptions)

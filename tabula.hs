@@ -34,11 +34,11 @@ module Main where
       updateGlobalLogger "tabula" (
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
-      Default defOpts -> startProject defaultDestination defOpts
+      Record recOpts -> startProject defaultDestination recOpts
       Cat catOpts -> catSession $ (fromMaybe defaultDestination (rGet db catOpts)) 
                           (rGet project catOpts)
 
-  startProject :: (Project -> Destination) -> PlainRec DefaultOptions -> IO ()
+  startProject :: (Project -> Destination) -> PlainRec RecordOptions -> IO ()
   startProject defaultDestination defOpts = let
       logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
                           (rGet project defOpts)
