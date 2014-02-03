@@ -150,13 +150,15 @@ module Tabula.Options (
         host <- P.option (connectHost defaultConnectInfo) $ 
           P.many1 (P.alphaNum <|> P.char '.')
         port <- P.option (connectPort defaultConnectInfo) $ 
-          liftA (PortNumber . fromIntegral . read) (P.char ':' >> P.many1 (P.digit))
+          liftA (PortNumber . fromIntegral . readInt) (P.char ':' >> P.many1 (P.digit))
         let connInfo = defaultConnectInfo {
             connectHost = host
           , connectPort = port
         }
         return $ redisDestination connInfo
       destinations = fileDest <|> redisDest
+      readInt :: String -> Integer
+      readInt = read
     in case P.parse destinations "Destination" s of
       Left err -> fail $ "Invalid destination: " ++ show err
       Right x -> return x

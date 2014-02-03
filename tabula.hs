@@ -13,11 +13,11 @@ module Main where
   import System.Log.Handler.Simple (fileHandler)
 
   import Tabula.Command.Cat
+  import Tabula.Command.Record
   import Tabula.Destination (Destination, Project)
   import Tabula.Destination.File (fileDestination)
   import Tabula.Internal.Agent
   import Tabula.Options
-  import Tabula.Shell (showShell)
 
   main :: IO ()
   main = getArgs >>= \case
@@ -42,7 +42,7 @@ module Main where
   startProject defaultDestination defOpts = let
       logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
                           (rGet project defOpts)
-    in showShell logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
+    in record logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do
