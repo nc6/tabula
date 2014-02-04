@@ -5,7 +5,7 @@ module Tabula.Destination.Redis (
     , defaultConnectInfo
     , ConnectInfo(..)
   ) where
-  import Control.Exception (handleJust)
+  import Control.Exception (evaluate, try)
   import Control.Monad (void)
   import Control.Monad.IO.Class
 
@@ -35,12 +35,9 @@ module Tabula.Destination.Redis (
     where 
       loop conn = awaitForever $ \rec -> let 
           recS = B.concat . L.toChunks $ encode rec
-        in liftIO . ensureConnection . runRedis conn $ do
-             void $ lpush project [recS]
-      ensureConnection = handleJust (\case 
-          ConnectionLost -> Just ()
-          _ -> Nothing)
-        (\_ -> return ())
+        in liftIO . void . tryR . runRedis conn $ do
+            rpush project [recS]
+      tryR = try . (>>= evaluate) :: IO a -> IO (Either ConnectionLostException a)
 
   -- Redis source. At the moment, just get all posts (should probably chunk nicely!)
   redisSource :: ConnectInfo -> B.ByteString -> Source (ResourceT IO) Record
@@ -58,7 +55,7 @@ module Tabula.Destination.Redis (
   lastRecord :: ConnectInfo -> B.ByteString -> IO (Maybe Record)
   lastRecord connInfo project = do
     conn <- connect connInfo
-    thing <- runRedis conn $ lindex project 0
+    thing <- runRedis conn $ lindex project (-1)
     case thing of
       Right (Just bs) -> return . decode . L.fromStrict $ bs
       _ -> return Nothing
