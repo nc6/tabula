@@ -53,7 +53,7 @@ module Tabula.Command.Cat (
       formatter = case fmt of
         Full -> DCL.map encodePretty =$= mkString "[" "," "]"
         AsHistory -> DCL.map (fmap (LB.pack . command) . fromJSONMaybe . entry) 
-          =$= DCL.catMaybes =$= mkString "" "\n" ""
+          =$= DCL.catMaybes =$= mkString "" "\n" "\n"
       fromJSONMaybe a = case fromJSON a of
         Error _ -> Nothing
         Success b -> Just b
