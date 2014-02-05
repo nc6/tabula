@@ -99,16 +99,19 @@ module Tabula.Options (
   -- Shared options
 
   projectOption :: Parser String
-  projectOption = argument str (metavar "PROJECT" <> value "default") 
+  projectOption = argument str (metavar "PROJECT" <> value "default")
+
+  destinationOption :: String -> Parser (Project -> Destination)
+  destinationOption helpText = nullOption (long "destination"
+                            <> short 'd'
+                            <> metavar "DESTINATION"
+                            <> reader readDestination
+                            <> help helpText)
 
   -- Option groups
   recordOptions :: Rec RecordOptions Parser
   recordOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
-                <+> db <-: optional (nullOption (long "destination"
-                            <> short 'd'
-                            <> metavar "DESTINATION"
-                            <> reader readDestination
-                            <> help "Destination to write logs to."))
+                <+> db <-: optional (destinationOption "Destination to write logs to.")
                 <+> bufferSize <-: option (long "bufferSize"
                                              <> metavar "SIZE"
                                              <> value 64
@@ -116,11 +119,7 @@ module Tabula.Options (
                 <+> project <-: projectOption
 
   catOptions :: Rec CatOptions Parser
-  catOptions = db <-: optional (nullOption (long "destination"
-                            <> short 'd'
-                            <> metavar "DESTINATION"
-                            <> reader readDestination
-                            <> help "Destination to read logs from."))
+  catOptions = db <-: optional (destinationOption "Destination to read logs from.")
               <+> project <-: projectOption
               <+> showAsHistory <-: (switch (long "as-history" 
                             <> help "Show in bash history format (e.g. only commands)"))
