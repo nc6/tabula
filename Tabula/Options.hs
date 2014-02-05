@@ -31,7 +31,9 @@ module Tabula.Options (
     , Command(..)
     , Options
     , RecordOptions
+    , CatOptions
     , readDestination
+    , showAsHistory
   ) where
   import Data.Char (toUpper)
   import Data.Vinyl
@@ -83,7 +85,9 @@ module Tabula.Options (
   bufferSize = Field :: "bufferSize" ::: Int
 
   -- | Cat options
-  type CatOptions = [ T_db, T_project ]
+  type T_showAsHistory = "showAsHistory" ::: Bool
+  showAsHistory = Field :: T_showAsHistory
+  type CatOptions = [ T_db, T_project, T_showAsHistory ]
 
   --------------- Parsers ------------------
 
@@ -118,6 +122,8 @@ module Tabula.Options (
                             <> reader readDestination
                             <> help "Destination to read logs from."))
               <+> project <-: projectOption
+              <+> showAsHistory <-: (switch (long "as-history" 
+                            <> help "Show in bash history format (e.g. only commands)"))
 
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 

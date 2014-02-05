@@ -53,8 +53,9 @@ module Main where
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
       Record recOpts -> startProject defaultDestination recOpts
-      Cat catOpts -> catSession $ (fromMaybe defaultDestination (rGet db catOpts)) 
-                          (rGet project catOpts)
+      Cat catOpts -> catSession dest fmt where
+        dest = (fromMaybe defaultDestination (rGet db catOpts)) (rGet project catOpts)
+        fmt = if (rGet showAsHistory catOpts) then AsHistory else Full
 
   startProject :: (Project -> Destination) -> PlainRec RecordOptions -> IO ()
   startProject defaultDestination defOpts = let
