@@ -17,8 +17,10 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
 module Tabula.Destination.File (
-  fileDestination
+  fileProvider
 ) where
+  import Control.Monad (filterM)
+
   import Data.Aeson
   import Data.Aeson.Encode.Pretty (encodePretty)
   import qualified Data.ByteString.Lazy as L
@@ -28,12 +30,26 @@ module Tabula.Destination.File (
   import qualified Data.Conduit.List as DCL
   import Data.Maybe (listToMaybe)
   
-  --import System.Directory
-  import System.FilePath ((</>))
+  import System.Directory
+  import System.FilePath ((</>), takeFileName)
   import System.IO (hClose, openBinaryFile, IOMode(ReadMode, AppendMode))
 
   import Tabula.Destination
   import Tabula.Record
+
+  projectFormat :: Project -> String
+  projectFormat (GlobalProject key) = key
+  projectFormat (UserProject _ key) = key
+
+  fileProvider :: FilePath -> DestinationProvider
+  fileProvider fp = DestinationProvider {
+      listProjects = do
+        entries <- getDirectoryContents fp
+        files <- filterM doesFileExist entries
+        return $ map (GlobalProject . takeFileName) files
+    , projectDestination = fileDestination fp . projectFormat
+    , removeProject = \project -> removeFile (fp </> projectFormat project)
+  }
 
   -- | A file destination. Only supports appending records.
   fileDestination :: FilePath -> String -> Destination

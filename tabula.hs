@@ -27,13 +27,15 @@ module Main where
 
   import System.Directory
   import System.Environment (getArgs)
+  import System.FilePath ((</>))
   import System.Log.Logger
   import System.Log.Handler.Simple (fileHandler)
+  import System.Posix.User (getLoginName)
 
   import Tabula.Command.Cat
   import Tabula.Command.Record
-  import Tabula.Destination (Destination, Project)
-  import Tabula.Destination.File (fileDestination)
+  import Tabula.Destination (Project(..), DestinationProvider, projectDestination)
+  import Tabula.Destination.File (fileProvider)
   import Tabula.Internal.Agent
   import Tabula.Options
 
@@ -46,22 +48,23 @@ module Main where
   run :: PlainRec Options -> IO ()
   run opts = do
     workDir <- ensureDataDir
-    let defaultDestination = fileDestination workDir
+    username <- getLoginName
+    let projectDir = workDir </> "projects"
+        defaultDestination = fileProvider projectDir
+    createDirectoryIfMissing False projectDir
     unless (rGet quiet opts) $ do
       logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
       updateGlobalLogger "tabula" (
         setLevel (rGet verbosity opts) . setHandlers [logFile])
     case (rGet command opts) of
-      Record recOpts -> startProject defaultDestination recOpts
+      Record recOpts -> 
+        record dest (rGet resume recOpts) (rGet bufferSize recOpts) where
+          dest = projectDestination (fromMaybe defaultDestination (rGet db recOpts)) $ 
+            UserProject username (rGet project recOpts)
       Cat catOpts -> catSession dest fmt where
-        dest = (fromMaybe defaultDestination (rGet db catOpts)) (rGet project catOpts)
+        dest = projectDestination (fromMaybe defaultDestination (rGet db catOpts)) $
+          UserProject username (rGet project catOpts)
         fmt = rGet showAsHistory catOpts
-
-  startProject :: (Project -> Destination) -> PlainRec RecordOptions -> IO ()
-  startProject defaultDestination defOpts = let
-      logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
-                          (rGet project defOpts)
-    in record logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do

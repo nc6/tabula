@@ -17,9 +17,9 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
 -- Redis destination for tabula
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase,OverloadedStrings #-}
 module Tabula.Destination.Redis (
-      redisDestination
+      redisProvider
     , defaultConnectInfo
     , ConnectInfo(..)
   ) where
@@ -38,11 +38,24 @@ module Tabula.Destination.Redis (
   import Tabula.Destination
   import Tabula.Record (Record)
 
-  redisDestination :: ConnectInfo -> String -> Destination
+  projectFormat :: Project -> B.ByteString
+  projectFormat (UserProject user key) = 
+    B.intercalate ":" ["tabula", "project", B.pack user, B.pack key]
+  projectFormat (GlobalProject key) = 
+    B.intercalate ":" ["tabula", "project", "global", B.pack key]
+
+  redisProvider :: ConnectInfo -> DestinationProvider
+  redisProvider connInfo = DestinationProvider {
+      listProjects = undefined
+    , projectDestination = redisDestination connInfo . projectFormat
+    , removeProject = undefined
+  }
+
+  redisDestination :: ConnectInfo -> B.ByteString -> Destination
   redisDestination connInfo project = Destination {
-      recordSink = redisSink connInfo (B.pack project)
-    , getLastRecord = lastRecord connInfo (B.pack project)
-    , recordSource = redisSource connInfo (B.pack project)
+      recordSink = redisSink connInfo project
+    , getLastRecord = lastRecord connInfo project
+    , recordSource = redisSource connInfo project
   }
 
   redisSink :: ConnectInfo -> B.ByteString -> Sink Record (ResourceT IO) ()

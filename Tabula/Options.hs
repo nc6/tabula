@@ -32,6 +32,7 @@ module Tabula.Options (
     , Options
     , RecordOptions
     , CatOptions
+    , T_project
     , readDestination
     , showAsHistory
   ) where
@@ -71,7 +72,7 @@ module Tabula.Options (
   type T_project = "project" ::: String
   project = Field :: T_project
   -- | Project database. At the moment, this is just a directory.
-  type T_db = "db" ::: Maybe (Project -> Destination)
+  type T_db = "db" ::: Maybe DestinationProvider
   db = Field :: T_db
 
   -- Default options --
@@ -102,7 +103,7 @@ module Tabula.Options (
   projectOption :: Parser String
   projectOption = argument str (metavar "PROJECT" <> value "default")
 
-  destinationOption :: String -> Parser (Project -> Destination)
+  destinationOption :: String -> Parser DestinationProvider
   destinationOption helpText = nullOption (long "destination"
                             <> short 'd'
                             <> metavar "DESTINATION"
@@ -163,13 +164,13 @@ module Tabula.Options (
     "EMERGENCY" -> return EMERGENCY 
     x -> fail $ "Invalid logging level specified: " ++ x
 
-  readDestination :: Monad m => String -> m (Project -> Destination)
+  readDestination :: Monad m => String -> m DestinationProvider
   readDestination s = let
       protoSep = P.string "://"
       path = P.many1 (P.noneOf ":")
       fileDest = P.string "file" >> protoSep >> do
         p <- path
-        return $ fileDestination p
+        return $ fileProvider p
       redisDest =  P.string "redis" >> protoSep >> do
         host <- P.option (connectHost defaultConnectInfo) $ 
           P.many1 (P.alphaNum <|> P.char '.')
@@ -179,7 +180,7 @@ module Tabula.Options (
             connectHost = host
           , connectPort = port
         }
-        return $ redisDestination connInfo
+        return $ redisProvider connInfo
       destinations = fileDest <|> redisDest
       readInt :: String -> Integer
       readInt = read

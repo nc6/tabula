@@ -21,7 +21,14 @@ module Tabula.Destination where
   import Data.Conduit
   import Tabula.Record
 
-  type Project = String
+  data Project = UserProject String String
+               | GlobalProject String
+
+  data DestinationProvider = DestinationProvider {
+      listProjects :: IO [Project]
+    , projectDestination :: Project -> Destination
+    , removeProject :: Project -> IO ()
+  }
   
   data Destination = Destination {
       recordSink :: Sink Record (ResourceT IO) () -- ^ Sink records to a store
