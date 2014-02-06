@@ -55,7 +55,7 @@ module Main where
       Record recOpts -> startProject defaultDestination recOpts
       Cat catOpts -> catSession dest fmt where
         dest = (fromMaybe defaultDestination (rGet db catOpts)) (rGet project catOpts)
-        fmt = if (rGet showAsHistory catOpts) then AsHistory else Full
+        fmt = rGet showAsHistory catOpts
 
   startProject :: (Project -> Destination) -> PlainRec RecordOptions -> IO ()
   startProject defaultDestination defOpts = let

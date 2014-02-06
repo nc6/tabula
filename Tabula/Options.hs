@@ -44,6 +44,7 @@ module Tabula.Options (
 
   import System.Log (Priority(..))
 
+  import Tabula.Command.Cat (Format(..))
   import Tabula.Destination
   import Tabula.Destination.File
   import Tabula.Destination.Redis
@@ -85,7 +86,7 @@ module Tabula.Options (
   bufferSize = Field :: "bufferSize" ::: Int
 
   -- | Cat options
-  type T_showAsHistory = "showAsHistory" ::: Bool
+  type T_showAsHistory = "showAsHistory" ::: Format
   showAsHistory = Field :: T_showAsHistory
   type CatOptions = [ T_db, T_project, T_showAsHistory ]
 
@@ -121,7 +122,7 @@ module Tabula.Options (
   catOptions :: Rec CatOptions Parser
   catOptions = db <-: optional (destinationOption "Destination to read logs from.")
               <+> project <-: projectOption
-              <+> showAsHistory <-: (switch (long "as-history" 
+              <+> showAsHistory <-: (flag Full AsHistory (long "as-history" 
                             <> help "Show in bash history format (e.g. only commands)"))
 
   commonOptions :: Rec CommonOptions Parser
