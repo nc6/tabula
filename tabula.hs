@@ -64,15 +64,20 @@ module Main where
         Record recOpts -> 
           record dest (rGet resume recOpts) (rGet bufferSize recOpts) where
             dest = projectDestination (dp defaultDestination recOpts) $ 
-              UserProject username (rGet project recOpts)
+              proj username recOpts
         Cat catOpts -> catSession dest fmt where
           dest = projectDestination (dp defaultDestination catOpts) $
-            UserProject username (rGet project catOpts)
+            proj username catOpts
           fmt = rGet showAsHistory catOpts
         List listOpts -> list $ dp defaultDestination listOpts
     where
       dp :: (T_db ∈ fields) => DestinationProvider -> PlainRec fields -> DestinationProvider
       dp dflt fields = (fromMaybe dflt (rGet db fields))
+      proj :: (T_project ∈ fields, T_global ∈ fields) => String -> PlainRec fields -> Project
+      proj un fields = let
+          p = rGet project fields
+          g = rGet global fields
+        in if g then GlobalProject p else UserProject un p
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do

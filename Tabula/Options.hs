@@ -28,12 +28,14 @@ module Tabula.Options (
     , resume
     , db
     , bufferSize
+    , global
     , Command(..)
     , Options
     , RecordOptions
     , CatOptions
     , T_project
     , T_db
+    , T_global
     , readDestination
     , readProjectName
     , showAsHistory
@@ -74,15 +76,21 @@ module Tabula.Options (
   -- | Specify which project 
   type T_project = "project" ::: String
   project = Field :: T_project
-  -- | Project database. At the moment, this is just a directory.
+
+  -- | Project database.
   type T_db = "db" ::: Maybe DestinationProvider
   db = Field :: T_db
+
+  -- | Use global namespace?
+  type T_global = "global" ::: Bool
+  global = Field :: T_global
 
   -- Default options --
   type RecordOptions = [ "resume" ::: Bool
                           , T_db
                           , "bufferSize" ::: Int
                           , T_project
+                          , T_global
                         ]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
@@ -92,9 +100,10 @@ module Tabula.Options (
   -- | Cat options
   type T_showAsHistory = "showAsHistory" ::: Format
   showAsHistory = Field :: T_showAsHistory
-  type CatOptions = [ T_db, T_project, T_showAsHistory ]
 
-  type ListOptions = T_db ': '[]
+  type CatOptions = [ T_db, T_project, T_showAsHistory, T_global ]
+
+  type ListOptions = '[T_db]
 
   --------------- Parsers ------------------
 
@@ -115,6 +124,11 @@ module Tabula.Options (
                             <> reader readDestination
                             <> help helpText)
 
+  globalOption :: Parser Bool
+  globalOption = switch (long "global"
+                         <> short 'g'
+                         <> help "Use global rather than user namespace.")
+
   -- Option groups
   recordOptions :: Rec RecordOptions Parser
   recordOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
@@ -124,12 +138,14 @@ module Tabula.Options (
                                              <> value 64
                                              <> help "Set buffer size (in multiples of 4096B)")
                 <+> project <-: projectOption
+                <+> global <-: globalOption
 
   catOptions :: Rec CatOptions Parser
   catOptions = db <-: optional (destinationOption "Destination to read logs from.")
               <+> project <-: projectOption
               <+> showAsHistory <-: (flag Full AsHistory (long "as-history" 
                             <> help "Show in bash history format (e.g. only commands)"))
+              <+> global <-: globalOption
 
   listOptions :: Rec ListOptions Parser
   listOptions = db <-: optional (destinationOption "Destination to list projects.")
