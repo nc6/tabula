@@ -35,6 +35,7 @@ module Tabula.Options (
     , T_project
     , T_db
     , readDestination
+    , readProjectName
     , showAsHistory
   ) where
   import Data.Char (toUpper)
@@ -105,7 +106,7 @@ module Tabula.Options (
   -- Shared options
 
   projectOption :: Parser String
-  projectOption = argument str (metavar "PROJECT" <> value "default")
+  projectOption = argument readProjectName (metavar "PROJECT" <> value "default")
 
   destinationOption :: String -> Parser DestinationProvider
   destinationOption helpText = nullOption (long "destination"
@@ -172,6 +173,11 @@ module Tabula.Options (
     "ALERT" -> return ALERT
     "EMERGENCY" -> return EMERGENCY 
     x -> fail $ "Invalid logging level specified: " ++ x
+
+  readProjectName :: Monad m => String -> m String
+  readProjectName s = case P.parse projectNameParser "Project name" s of
+      Left err -> fail $ "Invalid project name: " ++ show err
+      Right x -> return x
 
   readDestination :: Monad m => String -> m DestinationProvider
   readDestination s = let
