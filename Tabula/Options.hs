@@ -33,6 +33,7 @@ module Tabula.Options (
     , RecordOptions
     , CatOptions
     , T_project
+    , T_db
     , readDestination
     , showAsHistory
   ) where
@@ -55,6 +56,7 @@ module Tabula.Options (
 
   data Command = Record (PlainRec RecordOptions)
                | Cat (PlainRec CatOptions)
+               | List (PlainRec ListOptions)
 
   command = Field :: "command" ::: Command
 
@@ -91,6 +93,8 @@ module Tabula.Options (
   showAsHistory = Field :: T_showAsHistory
   type CatOptions = [ T_db, T_project, T_showAsHistory ]
 
+  type ListOptions = T_db ': '[]
+
   --------------- Parsers ------------------
 
   version :: Parser (a -> a)
@@ -126,6 +130,9 @@ module Tabula.Options (
               <+> showAsHistory <-: (flag Full AsHistory (long "as-history" 
                             <> help "Show in bash history format (e.g. only commands)"))
 
+  listOptions :: Rec ListOptions Parser
+  listOptions = db <-: optional (destinationOption "Destination to list projects.")
+
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 
                                             <> short 'V' 
@@ -145,8 +152,10 @@ module Tabula.Options (
                 (progDesc "Start or resume a project session."))
             <> Opt.command "cat" (
               info (fmap ((command =:) . Cat) $ dist catOptions)
-                (progDesc "Print a project session to stdout.")
-            )
+                (progDesc "Print a project session to stdout."))
+            <> Opt.command "ls" (
+              info (fmap ((command =:) . List) $ dist listOptions)
+                (progDesc "List all projects created at a destination."))
           )
       (<++>) a b = liftA2 (<+>) a b
 
@@ -171,7 +180,7 @@ module Tabula.Options (
       fileDest = P.string "file" >> protoSep >> do
         p <- path
         return $ fileProvider p
-      redisDest =  P.string "redis" >> protoSep >> do
+      redisDest = P.string "redis" >> protoSep >> do
         host <- P.option (connectHost defaultConnectInfo) $ 
           P.many1 (P.alphaNum <|> P.char '.')
         port <- P.option (connectPort defaultConnectInfo) $ 

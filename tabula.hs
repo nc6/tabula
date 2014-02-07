@@ -16,12 +16,15 @@ details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds, TypeOperators #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE LambdaCase, UnicodeSyntax #-}
 module Main where
   import Control.Monad (unless)
 
   import Data.Maybe (fromMaybe)
   import Data.Vinyl
+  import Data.Vinyl.Unicode
 
   import Options.Applicative (execParser)
 
@@ -33,6 +36,7 @@ module Main where
   import System.Posix.User (getLoginName)
 
   import Tabula.Command.Cat
+  import Tabula.Command.List
   import Tabula.Command.Record
   import Tabula.Destination (Project(..), DestinationProvider, projectDestination)
   import Tabula.Destination.File (fileProvider)
@@ -47,24 +51,28 @@ module Main where
 
   run :: PlainRec Options -> IO ()
   run opts = do
-    workDir <- ensureDataDir
-    username <- getLoginName
-    let projectDir = workDir </> "projects"
-        defaultDestination = fileProvider projectDir
-    createDirectoryIfMissing False projectDir
-    unless (rGet quiet opts) $ do
-      logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
-      updateGlobalLogger "tabula" (
-        setLevel (rGet verbosity opts) . setHandlers [logFile])
-    case (rGet command opts) of
-      Record recOpts -> 
-        record dest (rGet resume recOpts) (rGet bufferSize recOpts) where
-          dest = projectDestination (fromMaybe defaultDestination (rGet db recOpts)) $ 
-            UserProject username (rGet project recOpts)
-      Cat catOpts -> catSession dest fmt where
-        dest = projectDestination (fromMaybe defaultDestination (rGet db catOpts)) $
-          UserProject username (rGet project catOpts)
-        fmt = rGet showAsHistory catOpts
+      workDir <- ensureDataDir
+      username <- getLoginName
+      let projectDir = workDir </> "projects"
+          defaultDestination = fileProvider projectDir
+      createDirectoryIfMissing False projectDir
+      unless (rGet quiet opts) $ do
+        logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
+        updateGlobalLogger "tabula" (
+          setLevel (rGet verbosity opts) . setHandlers [logFile])
+      case (rGet command opts) of
+        Record recOpts -> 
+          record dest (rGet resume recOpts) (rGet bufferSize recOpts) where
+            dest = projectDestination (dp defaultDestination recOpts) $ 
+              UserProject username (rGet project recOpts)
+        Cat catOpts -> catSession dest fmt where
+          dest = projectDestination (dp defaultDestination catOpts) $
+            UserProject username (rGet project catOpts)
+          fmt = rGet showAsHistory catOpts
+        List listOpts -> list $ dp defaultDestination listOpts
+    where
+      dp :: (T_db ∈ fields) => DestinationProvider -> PlainRec fields -> DestinationProvider
+      dp dflt fields = (fromMaybe dflt (rGet db fields))
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do

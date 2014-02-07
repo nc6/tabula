@@ -23,6 +23,7 @@ module Tabula.Destination.Redis (
     , defaultConnectInfo
     , ConnectInfo(..)
   ) where
+  import Control.Applicative
   import Control.Exception (evaluate, try)
   import Control.Monad (void)
   import Control.Monad.IO.Class
@@ -37,17 +38,37 @@ module Tabula.Destination.Redis (
 
   import Tabula.Destination
   import Tabula.Record (Record)
+  import qualified Text.Parsec as P
 
-  projectFormat :: Project -> B.ByteString
-  projectFormat (UserProject user key) = 
+  showProject :: Project -> B.ByteString
+  showProject (UserProject user key) = 
     B.intercalate ":" ["tabula", "project", B.pack user, B.pack key]
-  projectFormat (GlobalProject key) = 
+  showProject (GlobalProject key) = 
     B.intercalate ":" ["tabula", "project", "global", B.pack key]
+
+  readProject :: (Monad m) => B.ByteString -> m Project
+  readProject p = let
+      (<+>) a b = (,) <$> a <*> b
+      sep = P.char ':'
+      ns = P.string "tabula" >> sep >> P.string "project" >> sep
+      projectName = P.many1 (P.alphaNum)
+      global = P.string "global" >> sep >> projectName >>= return . GlobalProject
+      username = P.many1 (P.alphaNum)
+      local = (username <* sep) <+> projectName >>= return . (uncurry UserProject)
+      project = ns >> global <|> local
+    in case P.parse project "Project" p of
+      Left err -> fail $ "Invalid project form: " ++ show err
+      Right x -> return x
 
   redisProvider :: ConnectInfo -> DestinationProvider
   redisProvider connInfo = DestinationProvider {
-      listProjects = undefined
-    , projectDestination = redisDestination connInfo . projectFormat
+      listProjects = do
+        conn <- connect connInfo
+        projects <- runRedis conn $ keys "tabula:project*"
+        case projects of
+          Right bs -> mapM readProject $ bs
+          Left _ -> fail "Problem fetching keys." -- TODO better errors!
+    , projectDestination = redisDestination connInfo . showProject
     , removeProject = undefined
   }
 

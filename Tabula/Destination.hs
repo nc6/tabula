@@ -24,6 +24,10 @@ module Tabula.Destination where
   data Project = UserProject String String
                | GlobalProject String
 
+  instance Show Project where
+    show (UserProject user key) = "("++user++") "++key
+    show (GlobalProject key) = "(global) "++key
+
   data DestinationProvider = DestinationProvider {
       listProjects :: IO [Project]
     , projectDestination :: Project -> Destination

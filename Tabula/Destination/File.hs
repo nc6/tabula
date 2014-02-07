@@ -45,7 +45,7 @@ module Tabula.Destination.File (
   fileProvider fp = DestinationProvider {
       listProjects = do
         entries <- getDirectoryContents fp
-        files <- filterM doesFileExist entries
+        files <- filterM doesFileExist . map (fp </>) $ entries
         return $ map (GlobalProject . takeFileName) files
     , projectDestination = fileDestination fp . projectFormat
     , removeProject = \project -> removeFile (fp </> projectFormat project)
@@ -61,8 +61,7 @@ module Tabula.Destination.File (
                         DCB.sinkHandle
     , getLastRecord = (runResourceT $ fileSource fp proj $$ DCL.consume) >>= 
         return . listToMaybe . reverse
-    , recordSource = fileSource fp proj
-          
+    , recordSource = fileSource fp proj          
   }
 
   fileSource :: FilePath -> String -> Source (ResourceT IO) Record
