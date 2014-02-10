@@ -28,10 +28,17 @@ module Tabula.Options (
     , resume
     , db
     , bufferSize
+    , global
     , Command(..)
     , Options
     , RecordOptions
+    , CatOptions
+    , T_project
+    , T_db
+    , T_global
     , readDestination
+    , readProjectName
+    , showAsHistory
   ) where
   import Data.Char (toUpper)
   import Data.Vinyl
@@ -42,6 +49,7 @@ module Tabula.Options (
 
   import System.Log (Priority(..))
 
+  import Tabula.Command.Cat (Format(..))
   import Tabula.Destination
   import Tabula.Destination.File
   import Tabula.Destination.Redis
@@ -51,6 +59,7 @@ module Tabula.Options (
 
   data Command = Record (PlainRec RecordOptions)
                | Cat (PlainRec CatOptions)
+               | List (PlainRec ListOptions)
 
   command = Field :: "command" ::: Command
 
@@ -67,15 +76,21 @@ module Tabula.Options (
   -- | Specify which project 
   type T_project = "project" ::: String
   project = Field :: T_project
-  -- | Project database. At the moment, this is just a directory.
-  type T_db = "db" ::: Maybe (Project -> Destination)
+
+  -- | Project database.
+  type T_db = "db" ::: Maybe DestinationProvider
   db = Field :: T_db
+
+  -- | Use global namespace?
+  type T_global = "global" ::: Bool
+  global = Field :: T_global
 
   -- Default options --
   type RecordOptions = [ "resume" ::: Bool
                           , T_db
                           , "bufferSize" ::: Int
                           , T_project
+                          , T_global
                         ]
   -- | Resume a session
   resume = Field :: "resume" ::: Bool
@@ -83,41 +98,57 @@ module Tabula.Options (
   bufferSize = Field :: "bufferSize" ::: Int
 
   -- | Cat options
-  type CatOptions = [ T_db, T_project ]
+  type T_showAsHistory = "showAsHistory" ::: Format
+  showAsHistory = Field :: T_showAsHistory
+
+  type CatOptions = [ T_db, T_project, T_showAsHistory, T_global ]
+
+  type ListOptions = '[T_db]
 
   --------------- Parsers ------------------
 
   version :: Parser (a -> a)
-  version = infoOption "Tabula version 0.1.2.0"
+  version = infoOption "Tabula version 0.2.0.0"
     (  long "version"
     <> help "Print version information" )
   
   -- Shared options
 
   projectOption :: Parser String
-  projectOption = argument str (metavar "PROJECT" <> value "default") 
+  projectOption = argument readProjectName (metavar "PROJECT" <> value "default")
+
+  destinationOption :: String -> Parser DestinationProvider
+  destinationOption helpText = nullOption (long "destination"
+                            <> short 'd'
+                            <> metavar "DESTINATION"
+                            <> reader readDestination
+                            <> help helpText)
+
+  globalOption :: Parser Bool
+  globalOption = switch (long "global"
+                         <> short 'g'
+                         <> help "Use global rather than user namespace.")
 
   -- Option groups
   recordOptions :: Rec RecordOptions Parser
   recordOptions = resume <-: (switch (long "resume" <> help "Resume existing session."))
-                <+> db <-: optional (nullOption (long "destination"
-                            <> short 'd'
-                            <> metavar "DESTINATION"
-                            <> reader readDestination
-                            <> help "Destination to write logs to."))
+                <+> db <-: optional (destinationOption "Destination to write logs to.")
                 <+> bufferSize <-: option (long "bufferSize"
                                              <> metavar "SIZE"
                                              <> value 64
                                              <> help "Set buffer size (in multiples of 4096B)")
                 <+> project <-: projectOption
+                <+> global <-: globalOption
 
   catOptions :: Rec CatOptions Parser
-  catOptions = db <-: optional (nullOption (long "destination"
-                            <> short 'd'
-                            <> metavar "DESTINATION"
-                            <> reader readDestination
-                            <> help "Destination to read logs from."))
+  catOptions = db <-: optional (destinationOption "Destination to read logs from.")
               <+> project <-: projectOption
+              <+> showAsHistory <-: (flag Full AsHistory (long "as-history" 
+                            <> help "Show in bash history format (e.g. only commands)"))
+              <+> global <-: globalOption
+
+  listOptions :: Rec ListOptions Parser
+  listOptions = db <-: optional (destinationOption "Destination to list projects.")
 
   commonOptions :: Rec CommonOptions Parser
   commonOptions = verbosity <-: (nullOption (long "verbosity" 
@@ -138,8 +169,10 @@ module Tabula.Options (
                 (progDesc "Start or resume a project session."))
             <> Opt.command "cat" (
               info (fmap ((command =:) . Cat) $ dist catOptions)
-                (progDesc "Print a project session to stdout.")
-            )
+                (progDesc "Print a project session to stdout."))
+            <> Opt.command "ls" (
+              info (fmap ((command =:) . List) $ dist listOptions)
+                (progDesc "List all projects created at a destination."))
           )
       (<++>) a b = liftA2 (<+>) a b
 
@@ -157,14 +190,19 @@ module Tabula.Options (
     "EMERGENCY" -> return EMERGENCY 
     x -> fail $ "Invalid logging level specified: " ++ x
 
-  readDestination :: Monad m => String -> m (Project -> Destination)
+  readProjectName :: Monad m => String -> m String
+  readProjectName s = case P.parse projectNameParser "Project name" s of
+      Left err -> fail $ "Invalid project name: " ++ show err
+      Right x -> return x
+
+  readDestination :: Monad m => String -> m DestinationProvider
   readDestination s = let
       protoSep = P.string "://"
       path = P.many1 (P.noneOf ":")
       fileDest = P.string "file" >> protoSep >> do
         p <- path
-        return $ fileDestination p
-      redisDest =  P.string "redis" >> protoSep >> do
+        return $ fileProvider p
+      redisDest = P.string "redis" >> protoSep >> do
         host <- P.option (connectHost defaultConnectInfo) $ 
           P.many1 (P.alphaNum <|> P.char '.')
         port <- P.option (connectPort defaultConnectInfo) $ 
@@ -173,7 +211,7 @@ module Tabula.Options (
             connectHost = host
           , connectPort = port
         }
-        return $ redisDestination connInfo
+        return $ redisProvider connInfo
       destinations = fileDest <|> redisDest
       readInt :: String -> Integer
       readInt = read

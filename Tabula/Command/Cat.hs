@@ -19,14 +19,16 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Tabula.Command.Cat (
-  catSession
+    catSession
+  , Format(..)
 ) where
   import Prelude hiding (init)
   import Control.Monad (unless)
 
+  import Data.Aeson
   import Data.Aeson.Encode.Pretty (encodePretty)
   import qualified Data.ByteString as B
-  import qualified Data.ByteString.Lazy as LB
+  import qualified Data.ByteString.Lazy.Char8 as LB
   import Data.Conduit
   import qualified Data.Conduit.Binary as DCB
   import qualified Data.Conduit.List as DCL
@@ -34,15 +36,27 @@ module Tabula.Command.Cat (
   import System.IO
 
   import Tabula.Destination
+  import Tabula.Record (entry)
+  import Tabula.Record.Console (command)
+
+  data Format = Full | AsHistory
 
   -- | Print a project log to stdout. 
   catSession :: Destination -- ^ Session to fetch logs from
+             -> Format -- ^ Show history commands only
              -> IO ()
-  catSession dest = runResourceT $ (recordSource dest) 
-    =$= DCL.map encodePretty
-    =$= mkString "[" "," "]"
-    =$= DCL.map (B.concat . LB.toChunks)
-    $$  DCB.sinkHandle stdout
+  catSession dest fmt = runResourceT $ (recordSource dest) 
+      =$= formatter
+      =$= DCL.map (B.concat . LB.toChunks)
+      $$  DCB.sinkHandle stdout
+    where 
+      formatter = case fmt of
+        Full -> DCL.map encodePretty =$= mkString "[" "," "]\n"
+        AsHistory -> DCL.map (fmap (LB.pack . command) . fromJSONMaybe . entry) 
+          =$= DCL.catMaybes =$= mkString "" "\n" "\n"
+      fromJSONMaybe a = case fromJSON a of
+        Error _ -> Nothing
+        Success b -> Just b
 
   mkString :: (Monad m) => 
               LB.ByteString -- ^ Initial marker

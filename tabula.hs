@@ -16,24 +16,30 @@ details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds, TypeOperators #-}
+{-# LANGUAGE FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE LambdaCase, UnicodeSyntax #-}
 module Main where
   import Control.Monad (unless)
 
   import Data.Maybe (fromMaybe)
   import Data.Vinyl
+  import Data.Vinyl.Unicode
 
   import Options.Applicative (execParser)
 
   import System.Directory
   import System.Environment (getArgs)
+  import System.FilePath ((</>))
   import System.Log.Logger
   import System.Log.Handler.Simple (fileHandler)
+  import System.Posix.User (getLoginName)
 
   import Tabula.Command.Cat
+  import Tabula.Command.List
   import Tabula.Command.Record
-  import Tabula.Destination (Destination, Project)
-  import Tabula.Destination.File (fileDestination)
+  import Tabula.Destination (Project(..), DestinationProvider, projectDestination)
+  import Tabula.Destination.File (fileProvider)
   import Tabula.Internal.Agent
   import Tabula.Options
 
@@ -45,22 +51,33 @@ module Main where
 
   run :: PlainRec Options -> IO ()
   run opts = do
-    workDir <- ensureDataDir
-    let defaultDestination = fileDestination workDir
-    unless (rGet quiet opts) $ do
-      logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
-      updateGlobalLogger "tabula" (
-        setLevel (rGet verbosity opts) . setHandlers [logFile])
-    case (rGet command opts) of
-      Record recOpts -> startProject defaultDestination recOpts
-      Cat catOpts -> catSession $ (fromMaybe defaultDestination (rGet db catOpts)) 
-                          (rGet project catOpts)
-
-  startProject :: (Project -> Destination) -> PlainRec RecordOptions -> IO ()
-  startProject defaultDestination defOpts = let
-      logDestination = (fromMaybe defaultDestination (rGet db defOpts)) 
-                          (rGet project defOpts)
-    in record logDestination (rGet resume defOpts) (rGet bufferSize defOpts)
+      workDir <- ensureDataDir
+      username <- getLoginName
+      let projectDir = workDir </> "projects"
+          defaultDestination = fileProvider projectDir
+      createDirectoryIfMissing False projectDir
+      unless (rGet quiet opts) $ do
+        logFile <- fileHandler (workDir ++ "/log") (rGet verbosity opts)
+        updateGlobalLogger "tabula" (
+          setLevel (rGet verbosity opts) . setHandlers [logFile])
+      case (rGet command opts) of
+        Record recOpts -> 
+          record dest (rGet resume recOpts) (rGet bufferSize recOpts) where
+            dest = projectDestination (dp defaultDestination recOpts) $ 
+              proj username recOpts
+        Cat catOpts -> catSession dest fmt where
+          dest = projectDestination (dp defaultDestination catOpts) $
+            proj username catOpts
+          fmt = rGet showAsHistory catOpts
+        List listOpts -> list $ dp defaultDestination listOpts
+    where
+      dp :: (T_db ∈ fields) => DestinationProvider -> PlainRec fields -> DestinationProvider
+      dp dflt fields = (fromMaybe dflt (rGet db fields))
+      proj :: (T_project ∈ fields, T_global ∈ fields) => String -> PlainRec fields -> Project
+      proj un fields = let
+          p = rGet project fields
+          g = rGet global fields
+        in if g then GlobalProject p else UserProject un p
 
   ensureDataDir :: IO FilePath
   ensureDataDir = do
