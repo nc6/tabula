@@ -6,7 +6,7 @@ Tabula reports either locally to a log file or centrally to a redis server. Usin
 
 Output is produced in JSON format for easy analysis.
 
-== Usage ==
+# Usage
 
 To start a basic recorded shell session, simply type `tabula start`. This will record to a session called default stores on your local machine at `$HOME/.tabula/projects`. Ctrl-d will terminate the recorded session and return you to your regular terminal.
 
@@ -42,7 +42,7 @@ Available commands:
   ls                       List all projects created at a destination.
 ```
 
-== Building from source ==
+# Building from source
 
 Prerequisites:
 The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/)
@@ -64,7 +64,7 @@ cabal build
 
 This will generate the tabula executable in dist/build/tabula/tabula.
 
-== Bash completions ==
+# Bash completions
 Tabula comes (courtesy of [optparse-applicative](http://hackage.haskell.org/package/optparse-applicative)) with the option to generate automatic bash completions. The easiest way to get access to these is the following:
 
     source <(tabula --bash-completion-script `which tabula`)
