@@ -20,7 +20,7 @@ Currently, tabula recognises two protocols for storage: `file://`, which stores 
 
 At present, tabula does not support authenticated connections to redis servers.
 
-To review an existing session, you can use `tabula cat` to print out the session. `cat` admits both the `-d` option and the project name in the same was as `start`. It also allows you to print only the commands invoked as if recorded by bash history - to do this, use the '--as-history' option.
+To review an existing session, you can use `tabula cat` to print out the session. `cat` admits both the `-d` option and the project name in the same was as `start`. It also allows you to print only the commands invoked as if recorded by bash history - to do this, use the `--as-history` option.
 
 To view all sessions available at a destination, you may use `tabula ls`.
 
