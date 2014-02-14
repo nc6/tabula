@@ -64,15 +64,15 @@ module Tabula.Shell (
   create newEnv = do
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
-#ifdef __linux__
-    installHandler sigWINCH (Catch . setWindowSize $ pty2m) Nothing
-#endif
     ph <- forkProcess $ shellProcess pty1s pty2s pty1s
     (h1m, h2m) <- uncurry (ap . fmap (,)) . join (***) fdToHandle $ (pty1m, pty2m)
     return $ Shell h1m h2m h1m ph
     where 
       openPtyHandles = do
         pty <- openPseudoTerminal
+#ifdef __linux__
+        installHandler sigWINCH (Catch . setWindowSize . fst $ pty) Nothing
+#endif
         getControllingTerminal >>= \a -> cloneAttr a (fst pty)
         s <- getTerminalName . snd $ pty
         debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
