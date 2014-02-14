@@ -67,10 +67,13 @@ executable tabula
                       , Tabula.Options
                       , Tabula.Shell
                       , Tabula.TTY
+                      , Tabula.TTY.Foreign
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
   
+  build-tools:          hsc2hs
+
   -- Other library packages from which modules are imported.
   build-depends:        base >=4.6 && <4.7
                       , aeson < 0.7
@@ -83,6 +86,7 @@ executable tabula
                       , filepath
                       , hedis
                       , hslogger
+                      , ioctl
                       , network
                       , optparse-applicative
                       , parsec

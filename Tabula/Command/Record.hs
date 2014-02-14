@@ -38,7 +38,6 @@ module Tabula.Command.Record (
   import System.Environment (getExecutablePath, getEnvironment)
   import System.Exit (ExitCode, exitWith)
   import System.IO (Handle(), hPutStrLn, stdin, stdout, stderr)
-  import System.Process (waitForProcess)
 
   import Tabula.Destination
   import Tabula.Record (entry)
@@ -75,7 +74,8 @@ module Tabula.Command.Record (
         Error _ -> Nothing
         Success b -> Just b
   
-  startRecording :: Shell -- ^ Shell to record.
+  startRecording :: ProcessWait a => 
+             Shell a -- ^ Shell to record.
           -> Destination -- ^ Destination to record to.
           -> Int -- ^ Buffer size
           -> IO ExitCode
@@ -102,7 +102,7 @@ module Tabula.Command.Record (
     injectEnv s "TABULA_PORT" sn
     hPutStrLn i "clear"
     -- Display the shell to the user
-    exitStatus <- waitForProcess ps
+    exitStatus <- waitRemote ps
     socFile <- socketName soc
     -- Close the pipes
     atomically $ writeTBMChan stopChan ()

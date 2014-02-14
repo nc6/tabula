@@ -16,10 +16,13 @@ details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
+{-# LANGUAGE LambdaCase, TypeSynonymInstances #-}
 module Tabula.Shell (
     create
   , injectEnv
   , Shell(Shell)
+  , ProcessWait
+  , waitRemote
 ) where
   import Control.Arrow
   import Control.Monad (ap, join)
@@ -27,42 +30,62 @@ module Tabula.Shell (
   import Data.Maybe (fromMaybe)
 
   import System.Environment (lookupEnv)
+  import System.Exit
   import System.IO (Handle(), hPutStrLn)
   import System.Log.Logger
-  import System.Posix.IO (fdToHandle)
+  import System.Posix.IO
+  import System.Posix.Process
+  import System.Posix.Signals
+  import System.Posix.Signals.Exts
   import System.Posix.Terminal
+  import System.Posix.Types (Fd, ProcessID)
   import System.Process
 
   import Tabula.Record.Environment
   import Tabula.TTY
 
-  data Shell = Shell Handle Handle Handle ProcessHandle
+  class ProcessWait a where
+    waitRemote :: a -> IO ExitCode
 
-  create :: Maybe Env -> IO Shell
+  instance ProcessWait ProcessHandle where
+    waitRemote = waitForProcess
+
+  instance ProcessWait ProcessID where
+    waitRemote pid = getProcessStatus True False pid >>= \case
+      Just (Exited exitCode) -> return exitCode
+      _ -> return $ ExitFailure 1
+
+  data Shell a = Shell Handle Handle Handle a
+
+  create :: Maybe Env -> IO (Shell ProcessID)
   create newEnv = do
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
-    ph <- do
-      myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
-      (_,_,_,ph) <- createProcess $ (proc myShell ["-il"]) {
-          std_in = UseHandle pty1s
-        , std_out = UseHandle pty2s
-        , std_err = UseHandle pty1s
-        , env = newEnv
-        , delegate_ctlc = True
-      }
-      return ph
-    return $ Shell pty1m pty2m pty1m ph
+    ph <- forkProcess $ shellProcess pty1s pty2s pty1s
+    (h1m, h2m) <- uncurry (ap . fmap (,)) . join (***) fdToHandle $ (pty1m, pty2m)
+    return $ Shell h1m h2m h1m ph
     where 
       openPtyHandles = do
         pty <- openPseudoTerminal
+        installHandler sigWINCH (Catch . setWindowSize $ fst pty) Nothing
         getControllingTerminal >>= \a -> cloneAttr a (fst pty)
         s <- getTerminalName . snd $ pty
         debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
-        uncurry (ap . fmap (,)) . join (***) fdToHandle $ pty
+        return pty
+      shellProcess :: Fd -> Fd -> Fd -> IO ()
+      shellProcess i o e = do
+        myShell <- fmap (fromMaybe "/bin/sh") $ lookupEnv "SHELL"
+        dupTo i stdInput
+        dupTo o stdOutput
+        dupTo e stdError
+        mapM_ closeFd [i,o]
+        --setWindowSize stdOutput
+        createSession
+        executeFile myShell False ["-il"] newEnv
+        exitImmediately ExitSuccess
 
   -- | Inject an environment variable into the running process.
-  injectEnv :: Shell -> String -> String -> IO ()
+  injectEnv :: (ProcessWait a) => Shell a -> String -> String -> IO ()
   injectEnv (Shell i _ _ _) key value = let
       cmd = "export " ++ key ++ "=\"" ++ value ++ "\""
     in hPutStrLn i cmd

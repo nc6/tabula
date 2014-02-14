@@ -19,9 +19,12 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 module Tabula.TTY where
   import Control.Exception.Base (bracket_)
 
-  import System.Posix.IO (openFd, OpenMode(ReadWrite), defaultFileFlags)
+  import System.Posix.IO (openFd, OpenMode(ReadWrite), defaultFileFlags, stdOutput)
+  import System.Posix.IOCtl
   import System.Posix.Terminal 
   import System.Posix.Types (Fd(..))
+
+  import Tabula.TTY.Foreign
 
   getControllingTerminal :: IO Fd
   getControllingTerminal = getControllingTerminalName >>= 
@@ -50,3 +53,8 @@ module Tabula.TTY where
   cloneAttr :: Fd -> Fd -> IO ()
   cloneAttr from to = getTerminalAttributes from >>= 
     \a -> setTerminalAttributes to a Immediately
+
+  setWindowSize :: Fd -> IO ()
+  setWindowSize fd = do
+    winSize <- ioctl' stdOutput TIOCGWINSZ
+    ioctl_ fd TIOCSWINSZ winSize
