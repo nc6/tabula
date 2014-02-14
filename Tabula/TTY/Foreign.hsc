@@ -16,10 +16,14 @@ details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, CPP #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-#include <sys/ttycom.h>
+#ifdef TARGET_OS_MAC
+  #include <sys/ttycom.h>
+#elif defined __linux__
+  #include <asm-generic/ioctls.h>
+#endif
 #include <sys/ioctl.h>
 
 module Tabula.TTY.Foreign where
