@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License along with
 this program. If not, see <http://www.gnu.org/licenses/>.
 -}
 {-# LANGUAGE LambdaCase, TypeSynonymInstances #-}
+{-# LANGUAGE CPP #-}
 module Tabula.Shell (
     create
   , injectEnv
@@ -35,8 +36,10 @@ module Tabula.Shell (
   import System.Log.Logger
   import System.Posix.IO
   import System.Posix.Process
+#ifdef __linux__
   import System.Posix.Signals
   import System.Posix.Signals.Exts
+#endif
   import System.Posix.Terminal
   import System.Posix.Types (Fd, ProcessID)
   import System.Process
@@ -61,13 +64,15 @@ module Tabula.Shell (
   create newEnv = do
     (pty1m, pty1s) <- openPtyHandles
     (pty2m, pty2s) <- openPtyHandles
+#ifdef __linux__
+    installHandler sigWINCH (Catch . setWindowSize $ pty2m) Nothing
+#endif
     ph <- forkProcess $ shellProcess pty1s pty2s pty1s
     (h1m, h2m) <- uncurry (ap . fmap (,)) . join (***) fdToHandle $ (pty1m, pty2m)
     return $ Shell h1m h2m h1m ph
     where 
       openPtyHandles = do
         pty <- openPseudoTerminal
-        installHandler sigWINCH (Catch . setWindowSize $ fst pty) Nothing
         getControllingTerminal >>= \a -> cloneAttr a (fst pty)
         s <- getTerminalName . snd $ pty
         debugM "tabula" $ "Acquired pseudo-terminal:\n\tSlave: " ++ s
@@ -79,8 +84,10 @@ module Tabula.Shell (
         dupTo o stdOutput
         dupTo e stdError
         mapM_ closeFd [i,o]
-        --setWindowSize stdOutput
         createSession
+#ifdef __linux__
+        setWindowSize stdOutput
+#endif
         executeFile myShell False ["-il"] newEnv
         exitImmediately ExitSuccess
 
