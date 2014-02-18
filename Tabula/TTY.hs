@@ -61,3 +61,6 @@ module Tabula.TTY where
     debugM "tabula" $ "Caught SIGWINCH - resizing window to:" ++ (show winSize)
     ioctl_ fd TIOCSWINSZ winSize
     ioctl' fd TIOCGWINSZ >>= debugM "tabula" . ("New window size: " ++ ) . show
+
+  setControllingTerminal :: Fd -> IO ()
+  setControllingTerminal fd = ioctl_ fd TIOCSCTTY 0

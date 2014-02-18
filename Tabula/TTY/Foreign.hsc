@@ -69,3 +69,8 @@ module Tabula.TTY.Foreign where
 
   instance IOControl TIOCSWINSZ WindowSize where
     ioctlReq _ = #const TIOCSWINSZ
+
+  data TIOCSCTTY = TIOCSCTTY
+
+  instance IOControl TIOCSCTTY Int where
+    ioctlReq _ = #const TIOCSCTTY

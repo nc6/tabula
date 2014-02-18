@@ -86,6 +86,7 @@ module Tabula.Shell (
         dupTo e stdError
         mapM_ closeFd [i,o]
         createSession
+        setControllingTerminal stdInput
         executeFile myShell False ["-il"] newEnv
         exitImmediately ExitSuccess
 
