@@ -90,13 +90,15 @@ module Tabula.Command.Record (
     stopChan <- atomically $ newTBMChan 1 -- Just contains the 'Stop' message
     let channels = (inChan, errChan, outChan, stopChan)
         promptCommand = tabula ++ " prompt \\$? \\$(history 1 | tr -s ' ' | cut -d' ' -f3-)"
+        promptCommandUnquoted = tabula ++ " prompt $? $(history 1 | tr -s ' ' | cut -d' ' -f3-)"
         trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
 
     injectEnv s "PROMPT_COMMAND" promptCommand
     hPutStrLn i $ trapCommand
     -- Start listening daemon in background thread
     (done, soc) <- daemon dest channels 
-                    [promptCommand, trapCommand, "clear"] bufSize
+                    [promptCommand, trapCommand, promptCommandUnquoted, "clear"] 
+                    bufSize
     sn <- socketName soc
     -- Inject relevant things
     injectEnv s "TABULA_PORT" sn

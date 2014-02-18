@@ -196,8 +196,15 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
                 exitStatus
                 events 
              )
-          in (unless (cmdFilter $ Rec.command rec) $ yield rec)
+          in (unless (recordFilter rec) $ yield rec)
             >> (go $ Session [] [] [] [] endTime posteriorEnv nwd posteriorEnv)
+          where
+            recordFilter = orF [
+                  cmdFilter . Rec.command
+                , null . Rec.events
+              ]
+            (|||) a b = \c -> if a c then True else b c
+            orF = foldl1 (|||)
 
       mkEvent (E.Debug time cmd pid ppid environment) oldEnv = 
         Rec.ConsoleEvent time cmd pid ppid (Env.diff oldEnv environment)
