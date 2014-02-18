@@ -19,6 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 module Tabula.TTY where
   import Control.Exception.Base (bracket_)
 
+  import System.Log.Logger
   import System.Posix.IO (openFd, OpenMode(ReadWrite), defaultFileFlags, stdOutput)
   import System.Posix.IOCtl
   import System.Posix.Terminal 
@@ -57,4 +58,6 @@ module Tabula.TTY where
   setWindowSize :: Fd -> IO ()
   setWindowSize fd = do
     winSize <- ioctl' stdOutput TIOCGWINSZ
+    debugM "tabula" $ "Caught SIGWINCH - resizing window to:" ++ (show winSize)
     ioctl_ fd TIOCSWINSZ winSize
+    ioctl' fd TIOCGWINSZ >>= debugM "tabula" . ("New window size: " ++ ) . show
