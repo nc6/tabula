@@ -72,6 +72,7 @@ module Tabula.Shell (
         pty <- openPseudoTerminal
 #ifdef __linux__
         installHandler sigWINCH (Catch . setWindowSize . fst $ pty) Nothing
+        setWindowSize (fst pty)
 #endif
         getControllingTerminal >>= \a -> cloneAttr a (fst pty)
         s <- getTerminalName . snd $ pty
