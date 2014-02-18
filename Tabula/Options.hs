@@ -41,6 +41,7 @@ module Tabula.Options (
     , showAsHistory
   ) where
   import Data.Char (toUpper)
+  import Data.Version (showVersion)
   import Data.Vinyl
   import Database.Redis (PortID(PortNumber))
 
@@ -54,6 +55,8 @@ module Tabula.Options (
   import Tabula.Destination.File
   import Tabula.Destination.Redis
   import qualified Text.Parsec as P
+
+  import qualified Paths_tabula as Paths (version)
 
   -------------- Options ------------------
 
@@ -108,7 +111,7 @@ module Tabula.Options (
   --------------- Parsers ------------------
 
   version :: Parser (a -> a)
-  version = infoOption "Tabula version 0.2.0.0"
+  version = infoOption ("Tabula version " ++ showVersion Paths.version)
     (  long "version"
     <> help "Print version information" )
   
