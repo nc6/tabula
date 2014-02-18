@@ -108,3 +108,7 @@ executable tabula
   -- Base language which the package is written in.
   default-language:    Haskell2010
   
+  if os(linux)
+    cpp-options:       -DOS_LINUX
+  if os(darwin)
+    cpp-options:       -DOS_MAC

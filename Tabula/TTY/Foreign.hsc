@@ -19,9 +19,9 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 {-# LANGUAGE ForeignFunctionInterface, CPP #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-#ifdef TARGET_OS_MAC
+#ifdef OS_MAC
   #include <sys/ttycom.h>
-#elif defined __linux__
+#elif defined OS_LINUX
   #include <asm-generic/ioctls.h>
 #endif
 #include <sys/ioctl.h>

@@ -36,7 +36,7 @@ module Tabula.Shell (
   import System.Log.Logger
   import System.Posix.IO
   import System.Posix.Process
-#ifdef __linux__
+#ifdef OS_LINUX
   import System.Posix.Signals
   import System.Posix.Signals.Exts
 #endif
@@ -70,7 +70,7 @@ module Tabula.Shell (
     where 
       openPtyHandles = do
         pty <- openPseudoTerminal
-#ifdef __linux__
+#ifdef OS_LINUX
         installHandler sigWINCH (Catch . setWindowSize . fst $ pty) Nothing
         setWindowSize (fst pty)
 #endif
