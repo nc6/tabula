@@ -57,18 +57,17 @@ module Tabula.Command.Record (
         else 
           return Nothing
       -- Set the old environment
-      oldEnv <- fmap Map.fromList $ case oldRecord of
+      oldEnv <- case oldRecord of
         Just e ->
-          return $ indifferentMerge (posteriorEnv e) (priorEnv e)
-        Nothing -> getEnvironment
-      -- Set HISTIGNORE
-      let oldHistIgnore = Map.lookup "HISTIGNORE" oldEnv
-          histIgnore = "[ \\t]*" ++ case oldHistIgnore of
-            Just a -> ":" ++ a
-            Nothing -> "" 
-          newEnv = Map.insert "HISTIGNORE" histIgnore oldEnv
+          return . Map.fromList $ indifferentMerge (posteriorEnv e) (priorEnv e)
+        Nothing -> getEnvironment >>= return . addHistIgnore . Map.fromList
+          where addHistIgnore env = (flip $ Map.insert "HISTIGNORE") env $
+                  "[ \\t]*" ++ case Map.lookup "HISTIGNORE" env of
+                    Just a -> ":" ++ a
+                    Nothing -> "" 
+
       -- Create a shell
-      shell@(Shell i _ _ _) <- create (Just . Map.toAscList $ newEnv)
+      shell@(Shell i _ _ _) <- create (Just . Map.toAscList $ oldEnv)
       -- Set controlling terminal to raw:
       getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
           -- Change directory
