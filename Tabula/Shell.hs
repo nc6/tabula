@@ -86,9 +86,6 @@ module Tabula.Shell (
         dupTo e stdError
         mapM_ closeFd [i,o]
         createSession
-#ifdef __linux__
-        setWindowSize stdOutput
-#endif
         executeFile myShell False ["-il"] newEnv
         exitImmediately ExitSuccess
 
