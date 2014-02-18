@@ -93,5 +93,5 @@ module Tabula.Shell (
   -- | Inject an environment variable into the running process.
   injectEnv :: (ProcessWait a) => Shell a -> String -> String -> IO ()
   injectEnv (Shell i _ _ _) key value = let
-      cmd = "export " ++ key ++ "=\"" ++ value ++ "\""
+      cmd = " export " ++ key ++ "=\"" ++ value ++ "\""
     in hPutStrLn i cmd

@@ -61,8 +61,14 @@ module Tabula.Command.Record (
         Just e ->
           return $ indifferentMerge (posteriorEnv e) (priorEnv e)
         Nothing -> getEnvironment
-          -- Create a shell
-      shell@(Shell i _ _ _) <- create (Just . Map.toAscList $ oldEnv)
+      -- Set HISTIGNORE
+      let oldHistIgnore = Map.lookup "HISTIGNORE" oldEnv
+          histIgnore = "[ \\t]*" ++ case oldHistIgnore of
+            Just a -> ":" ++ a
+            Nothing -> "" 
+          newEnv = Map.insert "HISTIGNORE" histIgnore oldEnv
+      -- Create a shell
+      shell@(Shell i _ _ _) <- create (Just . Map.toAscList $ newEnv)
       -- Set controlling terminal to raw:
       getControllingTerminal >>= \pt -> bracketChattr pt setRaw $ do
           -- Change directory
@@ -94,7 +100,7 @@ module Tabula.Command.Record (
         trapCommand = "trap '" ++ tabula ++ " trap $BASHPID $PPID $BASH_COMMAND' DEBUG"
 
     injectEnv s "PROMPT_COMMAND" promptCommand
-    hPutStrLn i $ trapCommand
+    putIgnoredLn i $ trapCommand
     -- Start listening daemon in background thread
     (done, soc) <- daemon dest channels 
                     [promptCommand, trapCommand, promptCommandUnquoted, "clear"] 
@@ -102,7 +108,7 @@ module Tabula.Command.Record (
     sn <- socketName soc
     -- Inject relevant things
     injectEnv s "TABULA_PORT" sn
-    hPutStrLn i "clear"
+    putIgnoredLn i "clear"
     -- Display the shell to the user
     exitStatus <- waitRemote ps
     socFile <- socketName soc
@@ -119,6 +125,7 @@ module Tabula.Command.Record (
         case name of 
           SockAddrUnix sn -> return sn
           _ -> error "No valid socket address."
+      putIgnoredLn h = hPutStrLn h . (" " ++)
 
   tee :: Int -> Handle -> Handle -> IO BSChan
   tee bufSize from to = do
