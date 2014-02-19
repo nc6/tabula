@@ -33,7 +33,7 @@ module Main where
   import System.FilePath ((</>))
   import System.Log.Logger
   import System.Log.Handler.Simple (fileHandler)
-  import System.Posix.User (getLoginName)
+  import System.Posix.User (getEffectiveUserName)
 
   import Tabula.Command.Cat
   import Tabula.Command.List
@@ -52,7 +52,7 @@ module Main where
   run :: PlainRec Options -> IO ()
   run opts = do
       workDir <- ensureDataDir
-      username <- getLoginName
+      username <- getEffectiveUserName
       let projectDir = workDir </> "projects"
           defaultDestination = fileProvider projectDir
       createDirectoryIfMissing False projectDir
