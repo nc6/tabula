@@ -19,6 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 module Tabula.Destination.File (
   fileProvider
 ) where
+  import Control.Applicative ((<$>))
   import Control.Monad (filterM)
 
   import Data.Aeson
@@ -33,6 +34,10 @@ module Tabula.Destination.File (
   import System.Directory
   import System.FilePath ((</>), takeFileName)
   import System.IO (hClose, openBinaryFile, IOMode(ReadMode, AppendMode))
+  import System.Posix.Files
+  import System.Posix.IO (handleToFd, fdToHandle)
+  import System.Posix.Types (FileMode)
+  import System.Posix.User (getEffectiveUserName)
 
   import Tabula.Destination
   import Tabula.Record
@@ -41,28 +46,52 @@ module Tabula.Destination.File (
   projectFormat (GlobalProject key) = key
   projectFormat (UserProject _ key) = key
 
-  fileProvider :: FilePath -> DestinationProvider
-  fileProvider fp = DestinationProvider {
-      listProjects = do
-        entries <- getDirectoryContents fp
-        files <- filterM doesFileExist . map (fp </>) $ entries
-        return $ map (GlobalProject . takeFileName) files
-    , projectDestination = fileDestination fp . projectFormat
-    , removeProject = \project -> removeFile (fp </> projectFormat project)
-  }
+  projectPermissions :: Project -> FileMode
+  projectPermissions (GlobalProject _) = foldl1 unionFileModes $ 
+    [
+        ownerReadMode, ownerWriteMode
+      , groupReadMode, groupWriteMode
+      , otherReadMode, otherWriteMode
+    ]
+  projectPermissions (UserProject _ _) = foldl1 unionFileModes $ 
+    [ownerReadMode, ownerWriteMode]
 
-  -- | A file destination. Only supports appending records.
-  fileDestination :: FilePath -> String -> Destination
-  fileDestination fp proj = Destination {
-      recordSink = DCL.map encodePretty =$= 
-        DCL.concatMap L.toChunks =$= bracketP 
-                        (openBinaryFile (fp </> proj) AppendMode) 
-                        hClose 
-                        DCB.sinkHandle
-    , getLastRecord = (runResourceT $ fileSource fp proj $$ DCL.consume) >>= 
-        return . listToMaybe . reverse
-    , recordSource = fileSource fp proj          
-  }
+  fileProvider :: FilePath -> DestinationProvider
+  fileProvider fp = let
+      readProject file = do
+        mode <-  fileMode <$> (getFileStatus file)
+        username <- getEffectiveUserName
+        return $ case (intersectFileModes mode groupReadMode) of
+          a | a == nullFileMode -> UserProject username (takeFileName file)
+          a | a == groupReadMode -> GlobalProject (takeFileName file)
+    in DestinationProvider {
+        listProjects = do
+          entries <- getDirectoryContents fp
+          files <- filterM doesFileExist . map (fp </>) $ entries
+          mapM readProject files
+      , projectDestination = fileDestination fp
+      , removeProject = \project -> removeFile (fp </> projectFormat project)
+    }
+
+  -- | A file destination.
+  fileDestination :: FilePath -> Project -> Destination
+  fileDestination fp proj = let 
+      projName = projectFormat proj
+      initFile = do
+        h <- (openBinaryFile (fp </> projName) AppendMode)
+        fd <- handleToFd h
+        setFdMode fd $ projectPermissions proj
+        fdToHandle fd
+    in Destination {
+        recordSink = DCL.map encodePretty =$= 
+          DCL.concatMap L.toChunks =$= bracketP 
+                          initFile
+                          hClose 
+                          DCB.sinkHandle
+      , getLastRecord = (runResourceT $ fileSource fp projName $$ DCL.consume) >>= 
+          return . listToMaybe . reverse
+      , recordSource = fileSource fp projName          
+    }
 
   fileSource :: FilePath -> String -> Source (ResourceT IO) Record
   fileSource fp proj = bracketP
