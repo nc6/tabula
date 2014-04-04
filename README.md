@@ -48,14 +48,12 @@ Prerequisites:
 The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/)
 [Cabal](http://www.haskell.org/cabal/)
 
-The easiest way to build is in a cabal sandbox. Most dependencies are available from Hackage, but Tabula requires Vinyl >= 0.2.1, which has not yet been released (as of 2014-02-11) and must be built locally.
+The easiest way to build is in a cabal sandbox.
 
 ```
-git clone git@github.com:VinylRecords/Vinyl.git
 git clone git@github.com:nc6/tabula.git
 cd tabula
 cabal sandbox init
-cabal sandbox add-source ../Vinyl
 cabal update
 cabal install --dependencies-only
 cabal configure
