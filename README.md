@@ -45,8 +45,8 @@ Available commands:
 # Building from source
 
 Prerequisites:
-The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/)
-[Cabal](http://www.haskell.org/cabal/)
+* The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/)
+* [Cabal](http://www.haskell.org/cabal/)
 
 The easiest way to build is in a cabal sandbox.
 
