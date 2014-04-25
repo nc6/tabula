@@ -21,6 +21,7 @@ module Tabula.Destination.File (
 ) where
   import Control.Applicative ((<$>))
   import Control.Monad (filterM)
+  import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 
   import Data.Aeson
   import Data.Aeson.Encode.Pretty (encodePretty)

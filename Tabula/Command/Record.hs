@@ -24,6 +24,7 @@ module Tabula.Command.Record (
   import Control.Concurrent.MVar (takeMVar)
   import Control.Concurrent.STM (atomically)
   import Control.Concurrent.STM.TBMChan (newTBMChan, writeTBMChan)
+  import Control.Monad.Trans.Resource (runResourceT)
 
   import Data.Aeson (Result(..), fromJSON)
   import Data.Conduit

@@ -25,6 +25,7 @@ module Tabula.Internal.Daemon (daemon, BSChan) where
   import Control.Concurrent.STM.TBMChan (newTBMChan, TBMChan())
   import Control.Monad (unless, void)
   import Control.Monad.IO.Class (MonadIO (liftIO))
+  import Control.Monad.Trans.Resource (MonadResource, runResourceT)
 
   import Data.Aeson (json, fromJSON, Result(..))
   import Data.ByteString (ByteString)

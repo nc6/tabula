@@ -19,6 +19,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 {-# LANGUAGE RankNTypes, FlexibleContexts #-}
 module Tabula.Destination where
   import Control.Applicative
+  import Control.Monad.Trans.Resource (ResourceT)
   import Data.Conduit
   import Tabula.Record
   import qualified Text.Parsec as P

@@ -27,6 +27,7 @@ module Tabula.Destination.Redis (
   import Control.Exception (evaluate, try)
   import Control.Monad (void)
   import Control.Monad.IO.Class
+  import Control.Monad.Trans.Resource (ResourceT)
 
   import Data.Aeson
   import qualified Data.ByteString.Char8 as B

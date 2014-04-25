@@ -24,6 +24,7 @@ module Tabula.Command.Cat (
 ) where
   import Prelude hiding (init)
   import Control.Monad (unless)
+  import Control.Monad.Trans.Resource (runResourceT)
 
   import Data.Aeson
   import Data.Aeson.Encode.Pretty (encodePretty)
